@@ -11,6 +11,22 @@ Không cần cài đặt hay build. Code dùng script thường (không ES modul
 - **Máy tính:** mở `index.html` bằng trình duyệt, hoặc chạy `python3 -m http.server 8000` rồi vào `http://localhost:8000`.
 - **GitHub Pages (khuyên dùng khi dùng iPhone):** repo → Settings → Pages → Source: *Deploy from a branch* → Branch `main`, thư mục `/ (root)` → Save. Sau 1–2 phút mở `https://<user>.github.io/<repo>/`.
 
+## Kiểm tra Phase 4.3 (string literal)
+```
+python3 tests/make_literal_ipas.py /tmp/fake_ipas && node tests/run_literal_tests.js /tmp/fake_ipas   # 53 (cần cả make_metadata_ipas.py cho 6 ca “không đủ điều kiện”)
+```
+Chỉ trích xuất string literal (v16–31 đã đối chiếu). Class/method/field/dump.cs CHƯA hỗ trợ. Test dùng metadata GIẢ LẬP.
+
+## Kiểm tra Phase 4.2 (Header và phiên bản global-metadata.dat)
+```
+python3 tests/make_fake_ipas.py /tmp/fake_ipas && python3 tests/make_scan_ipa.py /tmp/fake_ipas && python3 tests/make_unity_ipas.py /tmp/fake_ipas && python3 tests/make_metadata_ipas.py /tmp/fake_ipas
+node tests/run_detect_tests.js /tmp/fake_ipas   # 359
+node tests/run_scan_tests.js /tmp/fake_ipas     # 112
+node tests/run_unity_tests.js /tmp/fake_ipas    # 86
+node tests/run_metadata_tests.js /tmp/fake_ipas # 72
+```
+Trong trình duyệt: mục “Unity / Metadata” → thẻ “Header metadata”; chỉ đọc 4096 byte đầu, KHÔNG trích xuất. Trạng thái `generic_ok` chỉ là kiểm tra chung, không phải xác minh bố cục trường. Toàn bộ test dùng header GIẢ LẬP.
+
 ## Kiểm tra Phase 4.1 (Unity Component Discovery)
 
 1. Phân tích một IPA game Unity → bước **Unity IL2CPP (thành phần)** Xong (vd “IL2CPP · metadata selected”). IPA không phải Unity → bước “Bỏ qua”.

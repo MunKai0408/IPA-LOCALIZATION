@@ -252,3 +252,70 @@ Quy tắc: ứng viên = tên `global-metadata.dat` HOẶC magic `AF 1B B1 FA` (
 
 ## Chưa tồn tại (đừng gọi)
 Kiểm tra header/phiên bản global-metadata.dat (4.2), trích xuất string literal/namespace/class/method/field và `Meta/metadata_summary.json`, `Text/unity_string_literals.json` (4.3), `il2cpp_api.js`, font (5), text/localization (6), runtime import (7), template (8), Packager/Report/Export (9), engine khác (10).
+
+
+---
+# Bổ sung Phase 4 – SUB-PHASE 4.2 Metadata Header and Version (Account 04)
+
+## NS.MetadataDump (js/modules/metadata_dump.js) – Worker + luồng chính
+```
+MetadataDump.inspectHeader(bytes:Uint8Array, fileSize:number) -> HeaderResult   // THUẦN, đồng bộ, không ném lỗi với dữ liệu xấu
+MetadataDump.check(file, unityInfo, entries, {isCancelled?}) -> Promise<HeaderResult>   // entries = ENTRY GỐC của IpaReader.openZip; đọc ≤ READ_LIMIT byte đầu qua IpaReader.readEntry({head:true}); chỉ ném CANCELLED
+MetadataDump.notChecked(reason) -> HeaderResult (status 'not_checked', applicable:false)
+MetadataDump.toReportFields(h) -> { metadata_header_status, metadata_version, metadata_header_generic_checked } | null
+MetadataDump.toSummary(h) -> { schema:'metadata_summary/1', sub_phase:'4.2', partial:true, note, header:h } | null   // phần header của Meta/metadata_summary.json; 4.3 bổ sung phần còn lại
+MetadataDump.SCHEMA='metadata_header/1', READ_LIMIT=4096, MAGIC_HEX='AF 1B B1 FA', KNOWN_VERSIONS[17 số], VERSION_RANGE=[16,200], SOURCES[]
+```
+```
+HeaderResult (= results.unity.metadata_header) = {
+  schema:'metadata_header/1', sub_phase:'4.2',
+  status:'generic_ok'|'header_unverified'|'unsupported_version'|'invalid_header'|'bad_magic'|'read_error'|'not_checked',
+  applicable:boolean, path, entry_path, file_size:number|null, bytes_read:number, read_limit:4096,
+  magic:null|{hex, expected, matches}, version:null|{value, in_reference_list, reference_range, known_versions},
+  header:null|{first_table_offset, header_size, pair_count, pairs:[{index,offset,size}], empty_tables, max_table_end, trailing_bytes, overlaps},
+  layout:{field_names_verified:false, field_parse_supported:false, note}, reference_sources:string[],
+  findings:[{level:'error'|'warning'|'info', code, message}], reason:string, notes:string[], raw_header_hex:string(64 byte)
+}
+```
+Ý nghĩa trạng thái: `generic_ok` = magic đúng + version thuộc danh sách đã biết + các cặp offset/size nằm trong file (CHỈ kiểm tra chung, KHÔNG nghĩa là đã xác minh tên/ý nghĩa trường hay đọc được bảng). `header_unverified` = magic+version ổn nhưng giả định chung không áp dụng được (int32 byte 8 không dùng được làm kích thước header) → không kết luận hỏng. `unsupported_version` = version ngoài dải/không có trong danh sách → chỉ header thô, `header:null`. `invalid_header` = file quá ngắn, version vô lý (<0 hoặc >1000), hoặc cặp âm/vượt file/nằm trong header. `bad_magic` = magic ≠ AF 1B B1 FA (CÓ THỂ mã hóa/obfuscate; không khẳng định). `not_checked` = 4.1 không chọn được file metadata. Chồng chéo chỉ là cảnh báo (`overlap`), không đổi status.
+**Giả định kiểm tra chung** (ghi trong metadata_dump.js): header = dãy cặp int32 (offset, size|count) từ byte 8 đến offset của bảng đầu tiên (int32 ở byte 8; HEADER_MIN 16 … HEADER_MAX 1024). Chỉ có bằng chứng trực tiếp cho v24.2 (stringLiteralOffset=264). Nguồn đã đối chiếu trong phiên: Perfare/Il2CppDumper `Metadata.cs` (magic 0xFAB11BAF, version int32 kế tiếp, nhận 16..31, nhánh 24.x) và il2cpp_dumper 0.5.5 `metadata.rs` (nhận 16..200, danh sách version 16,17,19,20,21,22,24,27,29,31,33,35,38,39,104,105,106). **Bố cục TỪNG TRƯỜNG theo từng version KHÔNG được xác minh** → không gán tên trường.
+
+## Thay đổi ở module cũ
+- `UnityInfo`: `schema:'unity_info/2'`, `sub_phase:'4.2'`, thêm `metadata_header: HeaderResult|null` (`discover` đặt null; `IpaReader.analyze` điền). Phần còn lại không đổi.
+- `State.PIPELINE_STEPS`: thêm `{id:'metadata', label:'Metadata IL2CPP (header, phiên bản)'}` giữa `unity` và `extract`.
+- `IpaReader.analyze`: bước 6 `metadata` sau `unity` (`skipped` nếu không Unity hoặc 4.1 chưa chọn file; `done`; `error` chỉ khi read_error/ngoại lệ). Lỗi chỉ thành warning.
+- Worker importScripts thêm `../modules/metadata_dump.js` (sau unity_dump.js; trước ipa_reader.js); `index.html` nạp cùng thứ tự.
+- UI: `buildMetaHeaderCard` (nội bộ ui.js) hiển thị thẻ “Header metadata (sub-phase 4.2)” trong view Unity/Metadata; nút `#btn-metaheader-json` tải `metadata_summary.json` (phần header). `NS.VERSION='0.6.0-phase4.2'`.
+
+## Chưa tồn tại (đừng gọi)
+Đọc bảng metadata, string literal/namespace/class/method/field, `Meta/dump.cs`, `Text/unity_string_literals.json` (4.3), `il2cpp_api.js`, font (5), text/localization (6)…
+
+
+---
+# Bổ sung Phase 4 – SUB-PHASE 4.3 String Literal Extraction (Account 04)
+
+## API mới trong NS.MetadataDump (js/modules/metadata_dump.js)
+```
+MetadataDump.extractLiterals(file, unityInfo, entries, {isCancelled?, progress?(0..1)}) -> Promise<LiteralResult>   // chỉ ném CANCELLED; dùng IpaReader.streamEntry (luồng, không nạp cả file; chỉ giữ 2 vùng bảng+dữ liệu)
+MetadataDump.decodeLiterals(table:Uint8Array, data:Uint8Array) -> {literals, empty, invalid_utf8, out_of_range, distinct, total_text_bytes}   // THUẦN
+MetadataDump.toReportFields(h, lit?)  // thêm string_literals_status/count/invalid_utf8/out_of_range, metadata_not_supported[5]
+MetadataDump.toSummary(h, lit?) -> { schema:'metadata_summary/2', sub_phase:'4.3', partial:true, header, string_literals:{status,reason,version,count,empty,distinct,invalid_utf8,out_of_range,total_text_bytes,source}|null, not_supported:{assemblies,namespaces,classes,methods,fields:{status:'not_supported',reason}} }
+MetadataDump.LITERAL_VERSIONS=[16,17,19,20,21,22,24,27,29,31], LITERAL_SCHEMA='unity_string_literals/1', NOT_SUPPORTED[5]
+```
+```
+LiteralResult (= results.unity.metadata_literals = Text/unity_string_literals.json) = {
+  schema:'unity_string_literals/1', sub_phase:'4.3',
+  status:'ok'|'not_eligible'|'unsupported_version'|'invalid_table'|'too_large'|'read_error', reason, version, path, entry_path,
+  source:null|{table:{offset,size}, data:{offset,size}, struct_size:8}, count, empty, invalid_utf8, out_of_range, distinct, total_text_bytes,
+  literals:[{index, text:string|null, length, data_index, flags:('empty'|'invalid_utf8'|'out_of_range')[]}],   // KHÔNG gộp trùng; text=null khi ngoài vùng
+  limits:{max_table_bytes:64MiB, max_data_bytes:256MiB}, reference_sources[], notes[]
+}
+```
+**Cơ sở (đã đối chiếu 2 nguồn công khai):** bảng literal = cặp header #0 (offset, size BYTE), mỗi phần tử 8 B `{u32 length, u32 dataIndex}`; dữ liệu = cặp #1, chuỗi = UTF-8 tại `dataOffset + dataIndex`, `length` byte (Il2CppDumper `Metadata.cs`; il2cpp_dumper `structures.rs` – tóm tắt: length chỉ có trước v35). Chỉ hỗ trợ version có trong CẢ HAI nguồn (LITERAL_VERSIONS). v33/35/38+… → `unsupported_version`. Nếu >50% literal (≥8 mục) trỏ ngoài vùng dữ liệu → `invalid_table`, không xuất literal (bố cục thực tế có thể khác hoặc dữ liệu bị mã hóa).
+**CHƯA hỗ trợ (cố ý):** assembly/namespace/class/method/field và `Meta/dump.cs` – bố cục struct theo version chưa có byte-layout xác minh (chỉ có tóm tắt diễn giải). Cần đọc đầy đủ `MetadataClasses.cs`/`structures.rs`.
+
+## Thay đổi ở module cũ
+- `UnityInfo`: `schema:'unity_info/3'`, `sub_phase:'4.3'`, thêm `metadata_literals: LiteralResult|null`.
+- `State.PIPELINE_STEPS`: thêm `{id:'literals', label:'Metadata IL2CPP (string literal)'}` sau `metadata`.
+- `IpaReader.analyze`: bước 7 `literals` (skipped nếu header ≠ generic_ok hoặc version chưa hỗ trợ; done khi ok; error khi lỗi). Lỗi chỉ thành warning.
+- UI: `buildLiteralsCard` (tìm kiếm, phân trang 100 dòng); nút `#btn-literals-json` tải `unity_string_literals.json`; `#btn-metaheader-json` giờ truyền cả literal vào `toSummary`. `NS.VERSION='0.7.0-phase4.3'`.

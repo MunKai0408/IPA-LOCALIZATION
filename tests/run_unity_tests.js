@@ -18,7 +18,7 @@ const cnt = function (u, id) { const c = u.components.find(function (x) { return
 (async function () {
   /* 1. IL2CPP đầy đủ: đếm thành phần theo danh sách file đã biết */
   let r = await run('u41_full_il2cpp'), u = r.unity;
-  ok(u && u.schema === 'unity_info/1' && u.sub_phase === '4.1', 'schema/sub_phase');
+  ok(u && u.schema === 'unity_info/3' && u.sub_phase === '4.3', 'schema/sub_phase');
   ok(u.status === 'discovered' && u.applicable === true, 'full: status=' + u.status);
   ok(u.runtime.value === 'IL2CPP', 'full: runtime=' + u.runtime.value);
   const want = { unity_framework: 2, libil2cpp: 0, global_metadata: 1, metadata_dir: 1, mono_assemblies: 0, libmono: 0, data_resources: 1, streaming_assets: 1, data_raw: 4,

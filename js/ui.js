@@ -410,6 +410,79 @@
     selected: ['Đã chọn file metadata', 'success'], missing: ['Không tìm thấy file metadata', 'danger'], ambiguous: ['Nhiều ứng viên, chưa chọn', 'warning'],
     unreadable: ['Có ứng viên nhưng không đọc được', 'danger'], not_il2cpp: ['Không áp dụng (Unity Mono)', ''], not_applicable: ['Không áp dụng', '']
   };
+  const HEADER_STATUS = {
+    generic_ok: ['Header hợp lệ ở mức chung', 'success'], header_unverified: ['Chưa thể kiểm tra chung (bố cục chưa xác minh)', 'warning'],
+    unsupported_version: ['Phiên bản chưa hỗ trợ', 'warning'], invalid_header: ['Header không hợp lệ', 'danger'], bad_magic: ['Sai magic (có thể mã hóa/obfuscate)', 'danger'],
+    read_error: ['Không đọc được header', 'danger'], not_checked: ['Chưa kiểm tra', '']
+  };
+  function buildMetaHeaderCard(m) {
+    const card = h('div', { class: 'card mt-3' }, [h('h2', { class: 'section-title', text: 'Header metadata (sub-phase 4.2)' })]);
+    if (!m) { card.appendChild(h('p', { class: 'dim', text: 'Bước kiểm tra header không chạy (không có kết quả).' })); return card; }
+    const hs = HEADER_STATUS[m.status] || [m.status, ''];
+    const kv = h('dl', { class: 'kv' });
+    kv.appendChild(h('dt', { text: 'Trạng thái' }));
+    kv.appendChild(h('dd', {}, [h('span', { class: 'badge ' + hs[1], text: hs[0] })]));
+    kvRow(kv, 'Lý do', m.reason);
+    if (m.applicable) {
+      kvRow(kv, 'File', m.path || '—');
+      kvRow(kv, 'Kích thước file', m.file_size === null ? '—' : formatBytes(m.file_size) + ' (' + m.file_size + ' byte)');
+      kvRow(kv, 'Đã đọc', m.bytes_read + ' byte đầu (giới hạn ' + m.read_limit + ')');
+    }
+    if (m.magic) kvRow(kv, 'Magic', m.magic.hex + (m.magic.matches ? ' — khớp ' : ' — KHÔNG khớp ') + m.magic.expected);
+    if (m.version) kvRow(kv, 'Version', m.version.value + (m.version.in_reference_list ? ' (có trong danh sách đã biết)' : ' (không có trong danh sách đã biết)'));
+    if (m.header && m.header.header_size) {
+      kvRow(kv, 'Header (giả định chung)', m.header.header_size + ' byte · ' + m.header.pair_count + ' cặp offset/size · ' + m.header.empty_tables + ' bảng rỗng · ' + (m.header.overlaps || 0) + ' chồng chéo');
+      if (m.header.max_table_end !== null) kvRow(kv, 'Bảng kết thúc xa nhất', m.header.max_table_end + ' (còn ' + m.header.trailing_bytes + ' byte sau đó)');
+    }
+    card.appendChild(kv);
+    if (m.raw_header_hex) card.appendChild(listBlock('64 byte đầu (hex)', [m.raw_header_hex]));
+    if (m.header && m.header.pairs && m.header.pairs.length) {
+      card.appendChild(listBlock('Các cặp (offset, size) – chỉ đánh số, chưa gán tên trường', m.header.pairs.map(function (p) { return '#' + p.index + ': offset ' + p.offset + ', size ' + p.size; }), 40));
+    }
+    if (m.findings.length) card.appendChild(listBlock('Phát hiện', m.findings.map(function (f) { return '[' + f.level + '] ' + f.message; }), 40));
+    card.appendChild(h('p', { class: 'dim mt-2', text: m.layout.note }));
+    return card;
+  }
+  const LIT_STATUS = { ok: ['Đã trích xuất', 'success'], unsupported_version: ['Version chưa hỗ trợ trích xuất', 'warning'], invalid_table: ['Bảng không hợp lệ', 'danger'],
+    too_large: ['Quá lớn cho trình duyệt', 'danger'], read_error: ['Không đọc được', 'danger'], not_eligible: ['Không đủ điều kiện', ''] };
+  function buildLiteralsCard(l) {
+    const card = h('div', { class: 'card mt-3' }, [h('h2', { class: 'section-title', text: 'String literal (sub-phase 4.3)' })]);
+    if (!l) { card.appendChild(h('p', { class: 'dim', text: 'Chưa trích xuất: chỉ chạy khi header metadata đạt kiểm tra chung (xem thẻ trên). Assembly, namespace, class, method, field và dump.cs CHƯA được hỗ trợ vì bố cục struct chưa được xác minh từ nguồn đáng tin.' })); return card; }
+    const ls = LIT_STATUS[l.status] || [l.status, ''];
+    const kv = h('dl', { class: 'kv' });
+    kv.appendChild(h('dt', { text: 'Trạng thái' })); kv.appendChild(h('dd', {}, [h('span', { class: 'badge ' + ls[1], text: ls[0] })]));
+    kvRow(kv, 'Lý do', l.reason);
+    if (l.status === 'ok') {
+      kvRow(kv, 'Số literal', l.count + ' (' + l.distinct + ' khác nhau, ' + l.empty + ' rỗng)');
+      kvRow(kv, 'Lỗi dữ liệu', l.invalid_utf8 + ' UTF-8 không hợp lệ · ' + l.out_of_range + ' trỏ ngoài vùng dữ liệu');
+      kvRow(kv, 'Tổng dung lượng chữ', formatBytes(l.total_text_bytes));
+    }
+    card.appendChild(kv);
+    if (l.status === 'ok' && l.literals.length) {
+      const PAGE = 100; let page = 0, query = '';
+      const input = h('input', { type: 'search', class: 'input', placeholder: 'Tìm trong literal…', 'aria-label': 'Tìm literal' });
+      const info = h('span', { class: 'dim' }), prev = h('button', { class: 'btn btn-sm', type: 'button', text: '‹' }), next = h('button', { class: 'btn btn-sm', type: 'button', text: '›' });
+      const tbody = h('tbody'), table = h('table', { class: 'tbl' }, [h('thead', {}, [h('tr', {}, ['#', 'Văn bản', 'Byte', 'Cờ'].map(function (x) { return h('th', { text: x }); }))]), tbody]);
+      const draw = function () {
+        const q = query.toLowerCase();
+        const rows = q ? l.literals.filter(function (e) { return e.text !== null && e.text.toLowerCase().indexOf(q) >= 0; }) : l.literals;
+        const pages = Math.max(1, Math.ceil(rows.length / PAGE)); if (page >= pages) page = pages - 1;
+        tbody.replaceChildren();
+        rows.slice(page * PAGE, page * PAGE + PAGE).forEach(function (e) {
+          tbody.appendChild(h('tr', {}, [h('td', { text: String(e.index) }), h('td', { class: 'path', text: e.text === null ? '(không đọc được)' : (e.text.length > 300 ? e.text.slice(0, 300) + '…' : e.text) }), h('td', { text: String(e.length) }), h('td', { text: e.flags.join(', ') })]));
+        });
+        info.textContent = rows.length + ' / ' + l.literals.length + ' literal · trang ' + (page + 1) + '/' + pages;
+        prev.disabled = page === 0; next.disabled = page >= pages - 1;
+      };
+      input.addEventListener('input', function () { query = input.value; page = 0; draw(); });
+      prev.addEventListener('click', function () { page--; draw(); }); next.addEventListener('click', function () { page++; draw(); });
+      card.appendChild(h('div', { class: 'toolbar mt-2' }, [input, prev, next, info]));
+      card.appendChild(h('div', { class: 'table-wrap' }, [table]));
+      draw();
+    }
+    card.appendChild(h('p', { class: 'dim mt-2', text: 'Chưa hỗ trợ: assembly, namespace, class, method, field và dump.cs (bố cục struct chưa xác minh). Chuỗi trùng không bị gộp; chỉ hiển thị tối đa 300 ký tự mỗi dòng (JSON tải về đầy đủ).' }));
+    return card;
+  }
   let lastUnity = null;
   function renderUnity(s) {
     const u = (s.results && s.results.unity) || null;
@@ -460,8 +533,10 @@
           + (c.phase2_probe_version !== null ? ' · probe Phase 2: v' + c.phase2_probe_version : '') + (c.extraction_status && c.extraction_status !== 'ok' ? ' · ' + c.extraction_status : '');
       })));
     }
-    mc.appendChild(h('p', { class: 'dim mt-2', text: 'Mới chỉ xác định file. Kiểm tra header, phiên bản metadata và trích xuất sẽ có ở sub-phase 4.2 và 4.3. Phiên bản “probe Phase 2” chỉ là số đọc nhanh từ 8 byte đầu, chưa phải kiểm tra hợp lệ.' }));
+    mc.appendChild(h('p', { class: 'dim mt-2', text: 'Phiên bản “probe Phase 2” chỉ là số đọc nhanh từ 8 byte đầu, chưa phải kiểm tra hợp lệ; kết quả kiểm tra header nằm ở thẻ bên dưới (sub-phase 4.2).' }));
     box.appendChild(mc);
+    box.appendChild(buildMetaHeaderCard(u.metadata_header));
+    box.appendChild(buildLiteralsCard(u.metadata_literals));
 
     if (u.warnings.length || u.notes.length) {
       box.appendChild(h('div', { class: 'card mt-3' }, [

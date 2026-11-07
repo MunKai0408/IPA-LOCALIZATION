@@ -2,7 +2,7 @@
    Giao thức: main → {type:'analyze', file, opts}
               worker → {type:'step'|'progress'|'log'|'result'|'error', ...} */
 'use strict';
-importScripts('../plist_parser.js', '../binary_reader.js', '../modules/hash.js', '../modules/magic_bytes.js', '../modules/archive_scanner.js', '../modules/detect_engine.js', '../modules/file_scanner.js', '../modules/unity_dump.js', '../ipa_reader.js');
+importScripts('../plist_parser.js', '../binary_reader.js', '../modules/hash.js', '../modules/magic_bytes.js', '../modules/archive_scanner.js', '../modules/detect_engine.js', '../modules/file_scanner.js', '../modules/unity_dump.js', '../modules/metadata_dump.js', '../ipa_reader.js');
 
 self.onmessage = async function (ev) {
   const m = ev.data;

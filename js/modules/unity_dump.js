@@ -8,7 +8,7 @@
   'use strict';
   const NS = root.IPAStudio = root.IPAStudio || {};
 
-  const SCHEMA = 'unity_info/1';
+  const SCHEMA = 'unity_info/3';
   const SAMPLE_MAX = 25;                              // số file mẫu tối đa lưu cho mỗi thành phần (số đếm vẫn đầy đủ)
   const IL2CPP_MAGIC = 'AF 1B B1 FA';                // 4 byte đầu global-metadata.dat (cùng giá trị Phase 2 đã dùng)
   const STD_METADATA_PATH = 'data/managed/metadata/global-metadata.dat';
@@ -26,7 +26,7 @@
       note: 'Trên iOS libil2cpp thường nằm trong binary nên KHÔNG có file riêng; vắng mặt là bình thường.' },
     { id: 'global_metadata', label: 'global-metadata.dat', kind: 'metadata', group: 'dir', strong: true, runtime: 'il2cpp',
       test: function (p, n) { return n === 'global-metadata.dat'; },
-      note: 'Metadata IL2CPP (tên class/method/chuỗi). Header và phiên bản sẽ được kiểm ở sub-phase 4.2.' },
+      note: 'Metadata IL2CPP (tên class/method/chuỗi). Header và phiên bản được kiểm ở sub-phase 4.2 (xem thẻ “Header metadata”).' },
     { id: 'metadata_dir', label: 'Data/Managed/Metadata (hoặc il2cpp_data)', kind: 'directory', group: 'dir', strong: true, runtime: 'il2cpp',
       test: function (p) { return p.indexOf('data/managed/metadata/') === 0 || /(^|\/)il2cpp_data\//.test(p); },
       note: 'Thư mục chứa metadata của IL2CPP.' },
@@ -186,7 +186,7 @@
         if (pick) {
           input.status = 'selected'; input.path = pick.path; input.entry_path = pick.entry_path;
           input.reason = ok.length === 1 ? 'Chỉ có một file ứng viên.' : 'Chọn file ở vị trí chuẩn Data/Managed/Metadata có magic hợp lệ; ' + (ok.length - 1) + ' file khác giữ làm ứng viên phụ.';
-          if (pick.magic_matches === false) { input.reason += ' LƯU Ý: magic bytes KHÔNG khớp chữ ký metadata IL2CPP (có thể bị mã hóa/obfuscate hoặc không phải metadata); sub-phase 4.2 sẽ kiểm tra header, không đoán cấu trúc.'; }
+          if (pick.magic_matches === false) { input.reason += ' LƯU Ý: magic bytes KHÔNG khớp chữ ký metadata IL2CPP (có thể bị mã hóa/obfuscate hoặc không phải metadata); bước kiểm tra header (4.2) không đoán cấu trúc.'; }
           if (pick.magic_matches === null) input.reason += ' Chưa có magic bytes (không đọc được đầu file ở bước quét).';
           if (pick.extraction_status === 'crc_mismatch') input.reason += ' CẢNH BÁO: CRC32 không khớp khi quét → dữ liệu có thể hỏng.';
         } else {
@@ -198,18 +198,20 @@
     // ----- thông tin binary chính (chỉ ghi nhận, không giải mã) -----
     const m = ipa.macho || null;
     const mainBinary = m ? { path: m.path, size: m.size, archs: (m.archs || []).map(function (a) { return a.name; }), encrypted: m.encrypted } : null;
-    if (m && m.encrypted === true) warnings.push('Binary chính mã hóa FairPlay (cryptid≠0): công cụ không giải mã. Chưa kiểm cryptid của UnityFramework; ảnh hưởng tới file metadata sẽ biết sau khi sub-phase 4.2 đọc header.');
-    notes.push('Sub-phase 4.1 chỉ dò sự tồn tại và chọn file đầu vào: chưa đọc nội dung, chưa kiểm header/phiên bản metadata, chưa trích xuất chuỗi/class/method.');
+    if (m && m.encrypted === true) warnings.push('Binary chính mã hóa FairPlay (cryptid≠0): công cụ không giải mã. Chưa kiểm cryptid của UnityFramework; ảnh hưởng tới file metadata xem ở thẻ “Header metadata” (4.2).');
+    notes.push('Sub-phase 4.1 chỉ dò sự tồn tại và chọn file đầu vào (không đọc nội dung). Header/phiên bản metadata do 4.2 kiểm tra (trường metadata_header); chưa trích xuất chuỗi/class/method (4.3).');
 
     const found = all.filter(function (c) { return c.found; }).length;
     return {
-      schema: SCHEMA, sub_phase: '4.1', status: status, applicable: applicable,
+      schema: SCHEMA, sub_phase: '4.3', status: status, applicable: applicable,
       source: { kind: src.source, rows: src.rows.length, scanned: src.scanned, hash_mode: src.scanned && ipa.manifest.options ? ipa.manifest.options.hashMode : null },
       engine: eng ? { engine: eng.engine, variant: eng.variant, status: eng.status, confidence: eng.confidence, analysis_branch: eng.analysis_branch } : null,
       unity_version: eng && eng.engine === 'Unity' && eng.version ? { value: eng.version, source: eng.version_source } : null,
       runtime: { value: runtime, evidence: basis, engine_variant: engVariant, agrees_with_engine: agrees },
       components: all, components_found: found, components_total: all.length,
       metadata_input: input, main_binary: mainBinary,
+      metadata_literals: null, // 4.3: MetadataDump.extractLiterals điền trong IpaReader.analyze
+      metadata_header: null,   // 4.2: do MetadataDump.check điền trong IpaReader.analyze (discover thuần dữ liệu, không I/O)
       notes: notes, warnings: warnings
     };
   }

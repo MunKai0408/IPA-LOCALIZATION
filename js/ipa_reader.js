@@ -433,6 +433,49 @@
       warn('Tìm thành phần Unity thất bại: ' + ((e && e.message) || e));
       step('unity', 'error', (e && e.message) || 'Lỗi');
     }
+    progress(0.99);
+
+    /* --- Bước 6: kiểm tra HEADER + phiên bản global-metadata.dat (Phase 4, sub-phase 4.2). Chỉ đọc ≤ READ_LIMIT byte đầu. Lỗi chỉ thành cảnh báo. --- */
+    step('metadata', 'running', 'Kiểm tra header metadata');
+    try {
+      if (!NS.MetadataDump) throw new IpaError('NO_METADATA_MODULE', 'Thiếu module metadata_dump.js');
+      if (!result.unity || result.unity.status !== 'discovered') {
+        step('metadata', 'skipped', 'Không có Unity để kiểm tra');
+      } else if (result.unity.metadata_input.status !== 'selected') {
+        result.unity.metadata_header = NS.MetadataDump.notChecked('Không đọc metadata vì bước 4.1 chưa chọn được file (trạng thái: ' + result.unity.metadata_input.status + '). ' + result.unity.metadata_input.reason);
+        log('INFO', 'Metadata: không kiểm tra header – ' + result.unity.metadata_input.status);
+        step('metadata', 'skipped', 'Chưa có file metadata (' + result.unity.metadata_input.status + ')');
+      } else {
+        const h = await NS.MetadataDump.check(file, result.unity, entries, { isCancelled: cancelled });
+        result.unity.metadata_header = h;
+        const lvl = h.status === 'generic_ok' ? 'SUCCESS' : (h.status === 'read_error' || h.status === 'invalid_header' || h.status === 'bad_magic') ? 'ERROR' : 'WARNING';
+        log(lvl, 'Metadata header: ' + h.status + (h.version ? ' · version ' + h.version.value : '') + ' – ' + h.reason, { path: h.path, bytes_read: h.bytes_read, findings: h.findings.length });
+        step('metadata', h.status === 'read_error' ? 'error' : 'done', h.status + (h.version ? ' · v' + h.version.value : ''));
+      }
+    } catch (e) {
+      if (e && e.code === 'CANCELLED') throw e;
+      warn('Kiểm tra header metadata thất bại: ' + ((e && e.message) || e));
+      step('metadata', 'error', (e && e.message) || 'Lỗi');
+    }
+    progress(0.995);
+
+    /* --- Bước 7: trích xuất string literal (Phase 4, sub-phase 4.3). Chỉ khi header đạt kiểm tra chung và version đã đối chiếu. Lỗi chỉ thành cảnh báo. --- */
+    step('literals', 'running', 'Trích xuất string literal');
+    try {
+      const mh = result.unity && result.unity.metadata_header;
+      if (!mh || mh.status !== 'generic_ok') {
+        step('literals', 'skipped', 'Header metadata chưa đạt kiểm tra');
+      } else {
+        const lit = await NS.MetadataDump.extractLiterals(file, result.unity, entries, { isCancelled: cancelled });
+        result.unity.metadata_literals = lit;
+        log(lit.status === 'ok' ? 'SUCCESS' : 'WARNING', 'String literal: ' + lit.status + ' – ' + lit.reason, { count: lit.count, invalid_utf8: lit.invalid_utf8, out_of_range: lit.out_of_range });
+        step('literals', lit.status === 'ok' ? 'done' : (lit.status === 'unsupported_version' ? 'skipped' : 'error'), lit.status === 'ok' ? lit.count + ' literal' : lit.status);
+      }
+    } catch (e) {
+      if (e && e.code === 'CANCELLED') throw e;
+      warn('Trích xuất string literal thất bại: ' + ((e && e.message) || e));
+      step('literals', 'error', (e && e.message) || 'Lỗi');
+    }
     progress(1);
     return result;
   }

@@ -45,7 +45,7 @@
       results: Object.assign({}, s.results, { ipa: r, engine: r.engine || null, manifest: r.manifest || null, unity: r.unity || null, reportEngine: r.engine ? NS.DetectEngine.toReportFields(r.engine) : null })
     });
     r.warnings.forEach(function (w) { /* đã log trong IpaReader qua hook */ });
-    L.success('Phase 1–4.1 hoàn tất: đã đọc cấu trúc IPA, nhận diện engine, quét file và dò thành phần Unity', { module: 'events', step: 'read', details: { bundleId: r.app.bundleId, files: r.zip.fileCount, arch: r.architectures } });
+    L.success('Phase 1–4.3 hoàn tất: đã đọc cấu trúc IPA, nhận diện engine, quét file, dò thành phần Unity kiểm tra header metadata và trích xuất string literal', { module: 'events', step: 'read', details: { bundleId: r.app.bundleId, files: r.zip.fileCount, arch: r.architectures } });
     UI.toast(r.engine ? 'Engine: ' + r.engine.engine + (r.engine.variant ? ' ' + r.engine.variant : '') + ' (' + r.engine.status + ')' : 'Đã đọc xong cấu trúc IPA', r.engine && r.engine.status === 'unknown' ? 'warning' : 'success');
   }
 
@@ -141,6 +141,21 @@
       if (!u) { UI.toast('Chưa có kết quả Unity để tải', 'warning'); return; }
       const url = URL.createObjectURL(new Blob([JSON.stringify(u, null, 2)], { type: 'application/json;charset=utf-8' }));
       const a = document.createElement('a'); a.href = url; a.download = 'unity_info.json';
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    });
+    $('#btn-metaheader-json').addEventListener('click', function () {
+      const u = S.get().session.results.unity;
+      const sum = u && u.metadata_header ? NS.MetadataDump.toSummary(u.metadata_header, u.metadata_literals) : null;
+      if (!sum) { UI.toast('Chưa có kết quả header metadata để tải', 'warning'); return; }
+      const url = URL.createObjectURL(new Blob([JSON.stringify(sum, null, 2)], { type: 'application/json;charset=utf-8' }));
+      const a = document.createElement('a'); a.href = url; a.download = 'metadata_summary.json';
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    });
+    $('#btn-literals-json').addEventListener('click', function () {
+      const u = S.get().session.results.unity;
+      if (!u || !u.metadata_literals || u.metadata_literals.status !== 'ok') { UI.toast('Chưa có string literal để tải', 'warning'); return; }
+      const url = URL.createObjectURL(new Blob([JSON.stringify(u.metadata_literals, null, 2)], { type: 'application/json;charset=utf-8' }));
+      const a = document.createElement('a'); a.href = url; a.download = 'unity_string_literals.json';
       document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
     });
     $('#btn-log-download').addEventListener('click', function () {

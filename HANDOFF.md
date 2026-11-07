@@ -1,5 +1,49 @@
 # HANDOFF.md
 
+## Phiên hiện tại: Account 04 (SUB-PHASE 4.3) → bàn giao cho Account 05
+Vòng quay: 01 → 02 → … → 10 → 01.
+
+## Sub-phase 4.3 – METADATA EXTRACTION AND REPORT: HOÀN THÀNH MỘT PHẦN (string literal); phần còn lại cố ý chưa làm
+**Đã làm:** trích xuất string literal (xem INTERFACES.md “4.3”), hiển thị (tìm kiếm, phân trang), tải `unity_string_literals.json` và `metadata_summary.json` (v2), trường báo cáo. Căn cứ: 2 nguồn công khai (Il2CppDumper Metadata.cs; il2cpp_dumper structures.rs – tóm tắt) cho bảng literal v16–31 (tập LITERAL_VERSIONS).
+**Chưa làm, có chủ đích (đừng coi là hoàn thành):** assembly, namespace, class, method, field và `Meta/dump.cs`. Lý do: bố cục struct theo version không xác minh được từ nguồn (WebFetch chỉ trả tóm tắt diễn giải, không có byte-layout). Báo rõ trong UI/JSON (`not_supported`). Muốn làm: tìm nguồn có định nghĩa đầy đủ (vd file `Il2CppDumper/Il2Cpp/MetadataClasses.cs` — lần tìm kiếm này không lấy được) hoặc nhờ người dùng gửi, rồi xác minh bằng metadata thật.
+**Vì vậy 4.3 CHƯA nên đánh dấu “đạt đầy đủ”: còn thiếu phần class/method/field/dump.cs.** Account 05 nên hoặc (a) hoàn tất phần còn thiếu của 4.3 nếu đã có nguồn xác minh, hoặc (b) sang Phase 5 sau khi người dùng chấp nhận phạm vi hiện tại.
+
+Tạo: `tests/make_literal_ipas.py`, `tests/run_literal_tests.js`. Sửa: `js/modules/metadata_dump.js`, `js/modules/unity_dump.js` (schema `unity_info/3`, `metadata_literals`), `js/ipa_reader.js` (bước `literals`), `js/state.js`, `js/ui.js`, `js/events.js`, `index.html`, `js/app.js` (0.7.0-phase4.3), `tests/run_unity_tests.js` + `tests/run_metadata_tests.js` (1 dòng schema/sub_phase), README/INTERFACES/NEXT_TASK/HANDOFF.
+
+### Kiểm thử đã chạy – TẤT CẢ TRÊN DỮ LIỆU GIẢ LẬP tự dựng
+- detect 359, scan 112, unity 86, metadata 72, **literal 53** đạt: nội dung từng literal khớp bản dựng độc lập (Unicode, markup, trùng, rỗng, 5000 ký tự), v24/v29(stored)/v31, UTF-8 lỗi (cờ + ký tự thay), 1 mục ngoài vùng (text=null), bảng hỏng nặng (invalid_table), bảng không chia hết 8, bảng rỗng, v33/v35 (unsupported), không đủ điều kiện (bad magic, v23, byte8=0, không metadata, Mono, không Unity → skipped), 120.000 literal, hủy, đầu vào xấu, summary/report.
+- Chromium headless: 4 ca (v24, 120.000 literal ở khung 390 px, v35 unsupported, bad magic) — thẻ, tìm kiếm, phân trang, tải 2 JSON đúng; 0 lỗi JS, 0 request ngoài.
+**Chưa kiểm thử:** metadata THẬT (bất kỳ version), Safari iPhone thật, bộ nhớ với metadata thật lớn (giới hạn bảng 64 MiB / dữ liệu 256 MiB là ước lượng, chưa đo). Cặp #0/#1 = literal/literal-data dựa trên thứ tự trường ở 2 nguồn + mốc 264; chưa xác nhận bằng file thật.
+
+### Hạn chế còn tồn tại
+- Như 4.1/4.2; không có `.git` trong zip, không commit/push được từ phiên này.
+
+---
+## Phiên hiện tại: Account 04 (SUB-PHASE 4.2) → bàn giao cho Account 05
+Vòng quay: 01 → 02 → … → 10 → 01. (Phần Account 02/03 bên dưới vẫn đúng.)
+
+## Sub-phase 4.2 – METADATA HEADER AND VERSION (Account 04): HOÀN THÀNH (trên dữ liệu giả lập)
+Phạm vi: đọc ≤ 4096 byte đầu của `global-metadata.dat` đã chọn ở 4.1, kiểm magic `AF 1B B1 FA`, version (int32), và kiểm tra chung các cặp offset/size so với kích thước file. KHÔNG trích xuất (4.3), không giải mã.
+Tạo: `js/modules/metadata_dump.js`, `tests/make_metadata_ipas.py`, `tests/run_metadata_tests.js`.
+Sửa: `js/modules/unity_dump.js` (schema `unity_info/2`, sub_phase `4.2`, trường `metadata_header:null`, cập nhật vài câu chữ), `js/ipa_reader.js` (bước `metadata`), `js/state.js` (bước pipeline), `js/workers/ipa.worker.js`, `index.html` (script, nút `#btn-metaheader-json`, câu chữ), `js/ui.js` (`buildMetaHeaderCard`), `js/events.js` (nút tải, log), `js/app.js` (0.6.0-phase4.2), `tests/run_unity_tests.js` (1 dòng: schema/sub_phase mới), `README.md`, `INTERFACES.md`, `HANDOFF.md`, `NEXT_TASK.md`.
+
+### QUYẾT ĐỊNH QUAN TRỌNG (đọc kỹ)
+- Đã dùng WebSearch/WebFetch đối chiếu 2 nguồn công khai (Il2CppDumper `Metadata.cs`, il2cpp_dumper 0.5.5 `metadata.rs`) cho: magic, vị trí version, dải version, danh sách version đã biết, mốc 264 của v24.2. **Không lấy được định nghĩa struct header theo từng version** (trang bị cắt/không có nội dung) và không viết từ trí nhớ → **không có version nào được coi là “supported” ở mức trường**. Vì vậy bộ trạng thái khác NEXT_TASK cũ: thay `supported` bằng `generic_ok` (kiểm tra chung) và thêm `header_unverified`.
+- **4.3 BẮT BUỘC xác minh bố cục header từng version từ nguồn đáng tin (ví dụ lấy file `Il2CppDumper/Il2Cpp/MetadataClasses.cs` hoặc `structures.rs` qua WebSearch → WebFetch, hoặc nhờ người dùng gửi) TRƯỚC khi đọc bất kỳ bảng nào.** Nếu không xác minh được, 4.3 chỉ báo unsupported, không đoán.
+- Giả định chung (byte 8 = kích thước header) chưa được kiểm trên metadata thật ngoài v24.2; nếu IPA thật cho `header_unverified`/`invalid_header` sai, sửa giả định ở `inspectHeader`.
+
+### Kiểm thử đã chạy (4.2) – TẤT CẢ TRÊN DỮ LIỆU GIẢ LẬP do chính phiên này dựng
+- `node tests/run_detect_tests.js` 359 đạt; `run_scan_tests.js` 112 đạt; `run_unity_tests.js` 86 đạt (không hồi quy); `node tests/run_metadata_tests.js` **72 đạt**: header v24 (264 B/32 cặp), v29 (272 B/33 cặp), v31 + trailing; bad magic; file 0/6/8/10 byte; offset vượt file, offset+size vượt file, offset trong header, giá trị âm, chồng chéo (cảnh báo); version 23/15/150 (unsupported), 999999 và âm (invalid); byte 8 = 0 hoặc 5000 (header_unverified); header lẻ; 4.1 không chọn file (missing/ambiguous/mono/không Unity → not_checked/skipped, 0 byte); đo byte thật đọc từ File 20 MB stored (≤ 4096+94) và 30 MB deflate (≤ 2 MB, thực tế cắt luồng sớm); đầu vào xấu, lỗi đọc, hủy.
+- Chromium headless qua http: view trống trước phân tích; v24 → bước `metadata` “generic_ok · v24”, thẻ hiện đúng số liệu; bad_magic (khung 390 px, không tràn ngang), version 23, không metadata (not_checked) đều hiển thị đúng; tải `metadata_summary.json` đúng schema; Xóa phiên đưa view về trống; 0 lỗi JS, 0 request ra ngoài.
+**Chưa kiểm thử:** metadata THẬT của game (mọi version), IPA Unity thật, Safari iPhone thật, `file://`. Bước 0 (log IPA thật Phase 2–4) vẫn chưa có dữ liệu từ người dùng.
+
+### Hạn chế còn tồn tại
+- Như Phase 4.1 (chữ ký `AF 1B B1 FA` chưa có trong magic_bytes.js; chưa kiểm cryptid của UnityFramework).
+- Không có `.git` trong zip; không commit/push trong phiên này (không có quyền/remote). Người dùng cần tự đưa zip lên GitHub như các lượt trước.
+
+---
+(Ghi chú các phiên trước giữ nguyên bên dưới.)
+
 ## Phiên hiện tại: Account 03 (SUB-PHASE 4.1) → bàn giao cho Account 04
 (Các phần bên dưới ghi từ Account 02 vẫn đúng; phần mới của Account 03 nằm ở mục “Sub-phase 4.1”.)
 Vòng quay: 01 → 02 → … → 10 → 01. Ghi rõ số tài khoản đầu mỗi lần cập nhật file này.
