@@ -26,7 +26,7 @@
 
   const STATUS_LABEL = {
     idle: ['Chưa có IPA', ''], file_selected: ['Đã chọn file', 'info'], running: ['Đang phân tích', 'info'],
-    done: ['Hoàn tất', 'success'], error: ['Lỗi', 'danger'], cancelled: ['Đã hủy', 'warning']
+    read_done: ['Đã đọc cấu trúc IPA', 'success'], done: ['Hoàn tất', 'success'], error: ['Lỗi', 'danger'], cancelled: ['Đã hủy', 'warning']
   };
 
   const $ = function (sel, root) { return (root || document).querySelector(sel); };
@@ -152,15 +152,96 @@
 
     renderFileInfo(s);
     buildSteps();
-    $('#progress-bar').style.width = Math.round((s.progress || 0) * 100) + '%';
+    const total = s.steps.length;
+    const doneCount = s.steps.filter(function (x) { return x.status === 'done'; }).length;
+    const runCount = s.steps.filter(function (x) { return x.status === 'running'; }).length;
+    const pct = Math.round(((doneCount + runCount * 0.5) / total) * 100);
+    $('#progress-bar').style.width = pct + '%';
+    $('#progress').setAttribute('aria-valuenow', String(pct));
 
-    // nút – Phase 0: chưa có parser nên "Bắt đầu" luôn bị khóa
     const running = s.status === 'running';
-    $('#btn-start').disabled = true;
-    $('#btn-start').title = 'Parser IPA sẽ được triển khai ở Phase 1';
+    const canStart = !!s.file && !!s.fileCheck && s.fileCheck.ok && !running;
+    $('#btn-start').disabled = !canStart;
+    $('#btn-start').classList.toggle('loading', running);
+    $('#btn-start').title = canStart ? '' : (running ? 'Đang phân tích' : 'Chọn file .ipa hợp lệ trước');
     $('#btn-cancel').disabled = !running;
     $('#btn-clear').disabled = !s.file && s.status === 'idle';
-    $('#phase0-note').hidden = !s.file;
+    $('#phase-note').hidden = s.status !== 'read_done';
+    renderError(s);
+    renderDetails(s);
+  }
+
+  /* ---------- Lỗi + chi tiết ứng dụng ---------- */
+  function renderError(s) {
+    const box = $('#error-banner');
+    if (!s.error) { box.hidden = true; box.textContent = ''; return; }
+    box.hidden = false;
+    box.textContent = 'Lỗi [' + s.error.code + ']: ' + s.error.message;
+  }
+
+  function kvRow(dl, k, v) {
+    dl.appendChild(h('dt', { text: k }));
+    dl.appendChild(h('dd', { text: v == null || v === '' ? '—' : String(v) }));
+  }
+
+  function listBlock(title, arr, max) {
+    const cap = max || 300;
+    const items = arr.slice(0, cap).map(function (x) { return h('li', { text: x }); });
+    if (arr.length > cap) items.push(h('li', { text: '… và ' + (arr.length - cap) + ' mục khác' }));
+    return h('details', { class: 'list-block' }, [
+      h('summary', { text: title + ' (' + arr.length + ')' }),
+      arr.length ? h('ul', { class: 'plain-list' }, items) : h('p', { class: 'dim', text: 'Không có.' })
+    ]);
+  }
+
+  let lastIpa = null;
+  function renderDetails(s) {
+    const ipa = (s.results && s.results.ipa) || null;
+    if (ipa === lastIpa) return;
+    lastIpa = ipa;
+    const box = $('#app-detail'); box.replaceChildren(); box.hidden = !ipa;
+    const picker = $('#bundle-picker'); picker.replaceChildren(); picker.hidden = !ipa || ipa.bundles.length < 2;
+    if (!ipa) return;
+
+    if (ipa.bundles.length > 1) {
+      const sel = h('select', { id: 'bundle-select', class: 'select' }, ipa.bundles.map(function (b) { return h('option', { value: b, text: b }); }));
+      sel.value = ipa.selectedBundle;
+      picker.appendChild(h('label', { class: 'field' }, [h('span', { text: 'IPA có nhiều bundle .app. Chọn bundle cần phân tích (sẽ đọc lại):' }), sel]));
+    }
+
+    const a = ipa.app, m = ipa.macho;
+    const info = h('dl', { class: 'kv' });
+    kvRow(info, 'Tên', a.displayName || a.name || a.executable);
+    kvRow(info, 'Bundle ID', a.bundleId);
+    kvRow(info, 'Phiên bản', a.version ? a.version + (a.build ? ' (build ' + a.build + ')' : '') : a.build);
+    kvRow(info, 'MinimumOSVersion', a.minOS);
+    kvRow(info, 'Thiết bị', a.deviceFamilyNames.join(', '));
+    kvRow(info, 'Danh mục', a.category);
+    kvRow(info, 'File thực thi', a.executable);
+    kvRow(info, 'Kiến trúc', ipa.architectures.join(', ') || 'Không đọc được');
+    kvRow(info, 'Mã hóa FairPlay', !m ? 'Không xác định' : m.encrypted === true ? 'Có (cryptid≠0) – binary không đọc được' : m.encrypted === false ? 'Không' : 'Không xác định');
+    kvRow(info, 'Định dạng Info.plist', ipa.infoPlistFormat === 'binary' ? 'Binary plist' : 'XML');
+    kvRow(info, 'UIRequiredDeviceCapabilities', a.requiredCapabilities.join(', '));
+    box.appendChild(h('div', { class: 'card' }, [h('h2', { class: 'section-title', text: 'Thông tin ứng dụng' }), info]));
+
+    const z = ipa.zip, st = h('dl', { class: 'kv' });
+    kvRow(st, 'Bundle đang phân tích', ipa.selectedBundle);
+    kvRow(st, 'Tổng số file', z.fileCount);
+    kvRow(st, 'Dung lượng nén / giải nén', formatBytes(z.totalCompressed) + ' / ' + formatBytes(z.totalUncompressed));
+    kvRow(st, 'Thư mục Data', ipa.dataDir ? ipa.dataDir.files + ' file, ' + formatBytes(ipa.dataDir.bytes) : 'Không có');
+    kvRow(st, 'ZIP64', z.zip64 ? 'Có' : 'Không');
+    box.appendChild(h('div', { class: 'card' }, [
+      h('h2', { class: 'section-title', text: 'Cấu trúc bundle' }), st,
+      listBlock('Frameworks', ipa.frameworks), listBlock('PlugIns', ipa.plugins), listBlock('Thư mục *.lproj', ipa.lprojs),
+      listBlock('Thư mục cấp 1 của .app', ipa.topLevel.map(function (c) { return c.name + (c.isDir ? '/ (' + c.files + ' file)' : ''); }))
+    ]));
+
+    if (ipa.warnings.length) {
+      box.appendChild(h('div', { class: 'card' }, [
+        h('h2', { class: 'section-title', text: 'Cảnh báo (' + ipa.warnings.length + ')' }),
+        h('ul', { class: 'plain-list' }, ipa.warnings.map(function (w) { return h('li', { text: w }); }))
+      ]));
+    }
   }
 
   /* ---------- Log viewer ---------- */

@@ -1,0 +1,13 @@
+/* analyzer.css – thông tin ứng dụng, danh sách, cảnh báo */
+.kv { display: grid; grid-template-columns: minmax(120px, auto) 1fr; gap: 6px var(--space-4); font-size: 14px; }
+.kv dt { color: var(--text-dim); }
+.kv dd { overflow-wrap: anywhere; }
+#app-detail > .card + .card { margin-top: var(--space-4); }
+.list-block { margin-top: var(--space-3); border-top: 1px solid var(--border); padding-top: var(--space-2); }
+.list-block summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; font-weight: 600; }
+.plain-list { list-style: disc; padding-left: var(--space-5); font-size: 13px; font-family: var(--font-mono); max-height: 240px; overflow: auto; overflow-wrap: anywhere; }
+.plain-list li + li { margin-top: 2px; }
+.dim { color: var(--text-dim); }
+.banner-error { border-color: var(--danger); color: var(--danger); font-weight: 600; overflow-wrap: anywhere; }
+.select { min-height: 44px; padding: 0 var(--space-3); background: var(--bg-elev-2); border: 1px solid var(--border); border-radius: var(--radius-sm); width: 100%; }
+@media (max-width: 520px) { .kv { grid-template-columns: 1fr; gap: 0; } .kv dt { margin-top: var(--space-2); } }

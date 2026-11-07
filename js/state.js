@@ -14,7 +14,7 @@
     { id: 'package',  label: 'Đóng gói ZIP' }
   ];
 
-  // status của phiên: idle | file_selected | running | done | error | cancelled
+  // status của phiên: idle | file_selected | running | read_done (Phase 1 xong) | done | error | cancelled
   function initialSession() {
     return {
       status: 'idle',
@@ -29,6 +29,7 @@
       },
       steps: PIPELINE_STEPS.map(function (s) { return { id: s.id, label: s.label, status: 'pending', message: '' }; }),
       progress: 0,
+      error: null,           // { code, message } khi status = 'error'
       startedAt: null,
       completedAt: null
     };
@@ -64,6 +65,10 @@
         return s.id === id ? Object.assign({}, s, { status: status, message: message || '' }) : s;
       });
       NS.State.updateSession({ steps: steps });
+    },
+    /** Đặt lại các bước pipeline về 'pending' (trước mỗi lần chạy). */
+    resetSteps: function () {
+      NS.State.updateSession({ steps: PIPELINE_STEPS.map(function (s) { return { id: s.id, label: s.label, status: 'pending', message: '' }; }) });
     },
     /** Xóa toàn bộ dữ liệu phiên để giải phóng bộ nhớ. */
     resetSession: function () {

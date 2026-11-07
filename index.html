@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="css/layout.css">
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="css/analyzer.css">
   <link rel="stylesheet" href="css/responsive.css">
 </head>
 <body>
@@ -70,7 +71,9 @@
           </div>
           <dl class="file-info" id="file-info"></dl>
           <p class="mt-2"><span class="badge" id="file-check" hidden></span></p>
-          <p class="card mt-3" id="phase0-note" hidden>ℹ️ Phase 0: giao diện đã nhận file nhưng chưa giải nén hay phân tích. Parser IPA được triển khai ở Phase 1, vì vậy nút “Bắt đầu phân tích” đang khóa.</p>
+          <p class="card mt-3" id="phase-note" hidden>ℹ️ Phase 1 hoàn tất: đã đọc cấu trúc IPA và Info.plist. Nhận diện engine, quét file, font và chuỗi sẽ có ở các phase sau, nên các bước đó vẫn ở trạng thái “Chờ”.</p>
+          <div class="card banner-error mt-3" id="error-banner" role="alert" hidden></div>
+          <div class="card mt-3" id="bundle-picker" hidden></div>
           <div class="toolbar mt-3">
             <button class="btn btn-primary" id="btn-start" type="button" disabled>Bắt đầu phân tích</button>
             <button class="btn" id="btn-cancel" type="button" disabled>Hủy tác vụ</button>
@@ -81,9 +84,11 @@
 
         <div class="card">
           <h2 class="section-title">2. Tiến trình</h2>
-          <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100"><span id="progress-bar"></span></div>
+          <div class="progress" id="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100"><span id="progress-bar"></span></div>
           <div class="steps mt-3" id="steps"></div>
         </div>
+
+        <div id="app-detail" hidden></div>
 
         <div class="card">
           <div class="toolbar mb-3">
@@ -118,6 +123,10 @@
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
 <script src="js/modules/logger.js"></script>
+<script src="js/plist_parser.js"></script>
+<script src="js/binary_reader.js"></script>
+<script src="js/ipa_reader.js"></script>
+<script src="js/worker_manager.js"></script>
 <script src="js/state.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/events.js"></script>

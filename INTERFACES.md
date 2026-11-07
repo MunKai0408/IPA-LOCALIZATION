@@ -68,3 +68,60 @@ Events.selectFile(file)        // reset session, kiểm tra đuôi .ipa, set sta
 
 ## Chưa tồn tại (đừng gọi)
 IpaReader, PlistParser, BinaryReader, Hash, Manifest, Report, Export, WorkerManager, DetectEngine và mọi module phân tích khác.
+
+---
+# Bổ sung Phase 1 (Account 01)
+
+Module dùng chung luồng chính + worker: `(function(root){...})(typeof window!=='undefined'?window:self)`; namespace `root.IPAStudio`.
+
+## NS.PlistParser (js/plist_parser.js)
+```
+PlistParser.parse(bytes:Uint8Array) -> { format:'xml'|'binary', value:any }   // ném PlistError{code:'PLIST_ERROR'}
+PlistParser.isBinary(bytes) -> boolean
+```
+data → Uint8Array; date → chuỗi ISO; integer vượt 2^53 → chuỗi.
+
+## NS.BinaryReader (js/binary_reader.js)
+```
+BinaryReader.parseMachO(bytes:Uint8Array, fileSize?:number)
+  -> { format:'thin'|'fat'|'unknown', archs:[{name,cpuType,cpuSubtype,offset,size,bits,encrypted:true|false|null,cryptid}], needBytes:number, error?:string }
+```
+`needBytes` > bytes.length nghĩa là cần đọc thêm phần đầu file để xác định `encrypted`.
+
+## NS.IpaReader (js/ipa_reader.js)
+```
+IpaReader.LIMITS            -> { MAX_ENTRIES, MAX_CD_BYTES, MAX_TOTAL_UNCOMPRESSED, MAX_PLIST_BYTES, SUSPICIOUS_RATIO, MACHO_FIRST_READ, MACHO_MAX_READ }
+IpaReader.IpaError          -> class Error { code }  // NOT_ZIP, NO_PAYLOAD, NO_INFO_PLIST, ZIP_BOMB, TOO_MANY_ENTRIES, BAD_ZIP, ZIP64_TOO_LARGE, UNSAFE_PATH, ENCRYPTED_ENTRY, UNSUPPORTED_METHOD, ENTRY_TOO_LARGE, SIZE_MISMATCH, INFLATE_FAILED, NO_DECOMPRESSION, CANCELLED, ...
+IpaReader.openZip(file:File) -> Promise<{ entries:Entry[], zip64:boolean, fileSize:number }>
+  Entry = { name, size, csize, method, flags, crc, offset, dir, encrypted, symlink, unsafe:string|null }
+IpaReader.readEntry(file, entry, {max?:number, head?:boolean}) -> Promise<{ data:Uint8Array, truncated:boolean }>
+  head:true = chỉ đọc `max` byte đầu rồi dừng; head:false = đọc đủ, lỗi nếu vượt max hoặc vượt size khai báo.
+IpaReader.analyze(file, {bundle?:string}, hooks:{step?(id,status,msg), progress?(0..1), log?(level,msg,details), isCancelled?()})
+  -> Promise<IpaResult>
+IpaResult = {
+  fileName, ipaSize,
+  zip:{ entryCount, fileCount, totalCompressed, totalUncompressed, zip64, unsafeEntries, encryptedEntries, unsupportedMethodEntries },
+  bundles:string[], selectedBundle:string, appRoot:'Payload/X.app/',
+  app:{ bundleId,name,displayName,version,build,minOS,executable,category,deviceFamily:number[],deviceFamilyNames:string[],requiredCapabilities:string[],appFonts:string[] },
+  infoPlistFormat:'xml'|'binary', infoPlist:object,
+  architectures:string[], macho:null|{ path,size,format,archs,encrypted:true|false|null },
+  topLevel:[{name,isDir,files,bytes}], frameworks:string[], plugins:string[], lprojs:string[],
+  dataDir:null|{files,bytes}, hasScInfo:boolean,
+  entries:[{path,size,csize,method,dir,unsafe,encrypted}],   // TOÀN BỘ entry của IPA
+  warnings:string[], errors:string[]
+}
+```
+
+## NS.WorkerManager (js/worker_manager.js)
+```
+WorkerManager.runIpa(file, opts:{bundle?}, handlers:{onStep?,onProgress?,onLog?}) -> { promise:Promise<IpaResult>, cancel():void }
+  // promise reject Error có .code ('CANCELLED' khi hủy). Tự fallback luồng chính nếu Worker không tạo được.
+```
+Giao thức worker: main→`{type:'analyze',file,opts}`; worker→`{type:'step'|'progress'|'log'|'result'|'error'}`.
+
+## Thay đổi ở module cũ
+- `State`: thêm `resetSteps()`, `session.error:{code,message}|null`, status `'read_done'`.
+- `Events`: thêm `startAnalysis(bundle?)`.
+- `NS.VERSION = '0.2.0-phase1'`.
+- Cập nhật mục “Chưa tồn tại”: còn thiếu DetectEngine, Hash, Manifest, Report, Export và mọi module dump/phân tích khác.
+- DOM mới: #phase-note, #error-banner, #bundle-picker (#bundle-select), #app-detail, #progress.
