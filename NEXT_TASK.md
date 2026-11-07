@@ -1,26 +1,20 @@
-# NEXT_TASK.md – dành cho Account 02
+# NEXT_TASK.md – dành cho Account 03
 
 ## Trước khi làm
-1. Đọc `HANDOFF.md`, `INTERFACES.md`, file này, rồi prompt gốc (IPA_Localization_Studio_Prompt_Full.txt) mục 7, 23, 26 (Giai đoạn 3), 27 (PHASE 2), 28.
-2. `git log --oneline` + `git status` xác nhận code khớp HANDOFF. Mở trang, chạy thử một IPA (hoặc tạo IPA giả lập) để chắc Phase 1 còn chạy.
-3. **Không viết lại Phase 0/1, không đổi kiến trúc.**
+1. Đọc `HANDOFF.md`, `INTERFACES.md`, file này, rồi prompt gốc (IPA_Localization_Studio_Prompt_Full.txt) mục 3, 8, 9, 22, 26 (Giai đoạn 4), 27 (PHASE 3), 28. Nếu chưa có prompt gốc, yêu cầu người dùng gửi.
+2. Giải nén zip, `git log --oneline` + `git status` (nếu chưa có `.git` thì `git init`), chạy `node --check` mọi file JS, chạy `python3 tests/make_fake_ipas.py /tmp/fake_ipas && node tests/run_detect_tests.js /tmp/fake_ipas` phải đạt toàn bộ.
+3. **Không viết lại Phase 0/1/2, không đổi kiến trúc.** Chỉ sang Phase 3 khi người dùng đã yêu cầu (mục 28 prompt gốc: dừng chờ log Phase 2).
+4. Đầu phiên người dùng nên nói “Bạn là Account 0X”.
 
-## Nhiệm vụ: PHASE 2 – ENGINE DETECTION (chỉ Phase 2)
-Mục tiêu: sau khi đọc IPA, nhận diện engine dựa trên bằng chứng và ghi `engine.json` + phần engine của `report.json` (dạng dữ liệu trong session; việc đóng gói file vào ZIP là Phase 9).
-
-File cần tạo:
-- `js/modules/detect_engine.js` (dùng được cả luồng chính và worker, cùng kiểu bọc `root`): `DetectEngine.detect(ipaResult) -> EngineResult`.
-  Đầu vào: `session.results.ipa` (đã có `entries[]` đầy đủ, `frameworks`, `macho`, `infoPlist`, `topLevel`, `app.executable`).
-  Đầu ra theo mục 7 + 23 prompt: `{ engine, variant, confidence (0..1), status:'confirmed'|'probable'|'possible'|'unknown', evidence:[{indicator,path,weight}], missing_indicators:[], version:null, analysis_branch, notes }`.
-  Engine: Unity (IL2CPP/Mono), Unreal, Cocos2d-x/Creator, Godot, GameMaker, Defold, Flutter, React Native, Solar2D/Corona, Ren'Py, RPG Maker MV/MZ, Native iOS, Unknown. Luật dấu hiệu theo mục 7 prompt. Một dấu hiệu yếu chỉ cho probable/possible, không bao giờ “chắc chắn”. Tên file/đường dẫn dùng `entries[]`; framework dùng `frameworks`.
-  Phân biệt IL2CPP/Mono: `global-metadata.dat` hoặc `libil2cpp`/UnityFramework+metadata → IL2CPP; `Managed/*.dll` (Assembly-CSharp.dll) → Mono. Không đoán phiên bản Unity nếu không đọc được từ dữ liệu (để `version:null`).
-  Có thể đọc thêm vài byte đầu của file đặc trưng (magic UnityFS, `GDPC`, `FlutterAssets`…) bằng `IpaReader.readEntry(file, entry, {head:true,max:N})` – chỉ khi cần và có file; không bắt buộc.
-- Nối vào pipeline: chạy trong `IpaReader.analyze` hoặc bước riêng ở worker sau bước `plist`, gọi `step('engine', ...)`; lưu `session.engine` và `session.results.engine`. Hiện engine ở Dashboard và view “Engine” (thay trạng thái trống, hiển thị bằng chứng + missing_indicators + confidence).
-- Cập nhật `index.html` (script), `INTERFACES.md`, `HANDOFF.md`, `README.md` (mục kiểm tra Phase 2).
-
-Kiểm thử bắt buộc: tạo IPA giả lập cho ít nhất Unity IL2CPP, Unity Mono, Unreal, Flutter, React Native, Godot, Native iOS, Unknown (script Python tạo ZIP, như bài test Phase 1); kiểm tra confidence/status và rằng IPA chỉ có 1 dấu hiệu yếu không được “confirmed”. Không có request mạng, không số liệu hard-code.
+## Nhiệm vụ: PHASE 3 – FILE SCANNER (chỉ Phase 3)
+Theo mục 27 prompt: quét toàn bộ file, magic bytes, SHA1/SHA256, manifest.csv, File Explorer. Chi tiết mục 8 (copy_files.js) và mục 9 (nhận diện định dạng) của prompt gốc – đọc kỹ trước khi thiết kế.
+Gợi ý ràng buộc từ kiến trúc hiện có:
+- Nguồn danh sách file: `session.results.ipa.entries[]` (đã có path/size/csize/method/dir/unsafe/encrypted) – không đọc lại central directory. Đọc nội dung bằng `IpaReader.openZip` (cần offset) + `IpaReader.readEntry(file, entry, {max, head})`; module mới chạy trong worker phải thêm vào `importScripts` của `ipa.worker.js` (sau `detect_engine.js`), module luồng chính thêm `<script>` trước `state.js`.
+- Băm SHA: dùng `crypto.subtle` (SHA-1/SHA-256, không thư viện ngoài); file lớn phải băm theo luồng/từng phần và có tiến trình + hủy; entry unsafe/encrypted/unsupported ghi trạng thái, không bỏ qua im lặng.
+- Gắn vào bước pipeline `scan` (đã có trong `State.PIPELINE_STEPS`); lưu `session.manifest`, `session.stats.totalFiles`; view `explorer` thay trạng thái trống (như cách Phase 2 làm với view `engine`: bỏ `empty` trong `UI.VIEWS`, thêm section tĩnh trong index.html, hàm render có cache theo tham chiếu kết quả).
+- Có thể dùng `session.results.engine.analysis_branch` để chọn quy tắc phân loại, nhưng không được giả định engine đúng khi status ≠ confirmed.
+- Không số liệu hard-code, không dữ liệu giả; cập nhật `INTERFACES.md`, `HANDOFF.md`, `README.md` (mục kiểm tra Phase 3); viết test tạo IPA giả lập trong `tests/`.
 
 ## Quy tắc bàn giao
-- Không sang Phase 3 khi chưa được yêu cầu.
 - Khi ngữ cảnh/tài nguyên gần hết: dừng, cập nhật 3 file, commit, báo người dùng; không tuyên bố push/commit nếu lệnh chưa thành công.
-- Đầu phiên người dùng nên nói “Bạn là Account 0X”.
+- Không sang Phase 4 khi chưa được yêu cầu.

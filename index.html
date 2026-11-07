@@ -71,7 +71,7 @@
           </div>
           <dl class="file-info" id="file-info"></dl>
           <p class="mt-2"><span class="badge" id="file-check" hidden></span></p>
-          <p class="card mt-3" id="phase-note" hidden>ℹ️ Phase 1 hoàn tất: đã đọc cấu trúc IPA và Info.plist. Nhận diện engine, quét file, font và chuỗi sẽ có ở các phase sau, nên các bước đó vẫn ở trạng thái “Chờ”.</p>
+          <p class="card mt-3" id="phase-note" hidden>ℹ️ Phase 2 hoàn tất: đã đọc cấu trúc IPA, Info.plist và nhận diện engine (xem mục “Engine”). Quét file, font và chuỗi sẽ có ở các phase sau, nên các bước đó vẫn ở trạng thái “Chờ”.</p>
           <div class="card banner-error mt-3" id="error-banner" role="alert" hidden></div>
           <div class="card mt-3" id="bundle-picker" hidden></div>
           <div class="toolbar mt-3">
@@ -101,6 +101,16 @@
         </div>
       </section>
 
+      <!-- ENGINE (Phase 2) -->
+      <section class="view" id="view-engine" hidden>
+        <div class="card empty" id="engine-empty">
+          <div class="empty-icon" aria-hidden="true">⚙</div>
+          <h2>Engine</h2>
+          <p>Chưa có kết quả nhận diện engine. Tải IPA ở mục “Phân tích IPA” rồi bấm Bắt đầu phân tích.</p>
+        </div>
+        <div id="engine-detail" hidden></div>
+      </section>
+
       <!-- Các view chưa triển khai (ui.js sinh ra) -->
       <div id="generic-views"></div>
 
@@ -125,6 +135,7 @@
 <script src="js/modules/logger.js"></script>
 <script src="js/plist_parser.js"></script>
 <script src="js/binary_reader.js"></script>
+<script src="js/modules/detect_engine.js"></script>
 <script src="js/ipa_reader.js"></script>
 <script src="js/worker_manager.js"></script>
 <script src="js/state.js"></script>

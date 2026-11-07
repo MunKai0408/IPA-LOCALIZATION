@@ -11,6 +11,14 @@ Không cần cài đặt hay build. Code dùng script thường (không ES modul
 - **Máy tính:** mở `index.html` bằng trình duyệt, hoặc chạy `python3 -m http.server 8000` rồi vào `http://localhost:8000`.
 - **GitHub Pages (khuyên dùng khi dùng iPhone):** repo → Settings → Pages → Source: *Deploy from a branch* → Branch `main`, thư mục `/ (root)` → Save. Sau 1–2 phút mở `https://<user>.github.io/<repo>/`.
 
+## Kiểm tra Phase 2
+
+1. Chạy phân tích một IPA thật → bước **Nhận diện engine** chuyển Xong, kèm kết quả (vd “Unity IL2CPP · confirmed”).
+2. Tổng quan: ô **Engine phát hiện** có tên, biến thể và trạng thái. Mục **Engine**: bảng kết quả, bằng chứng (đường dẫn thật trong IPA), dấu hiệu còn thiếu, ghi chú, engine khác có dấu hiệu.
+3. IPA ít dấu hiệu → trạng thái *possible/unknown*, **không bao giờ “confirmed” chỉ từ một dấu hiệu yếu**; Unknown chuyển nhánh phân tích chung.
+4. Phiên bản engine chỉ hiện khi đọc được từ dữ liệu (header UnityFS, GDPC); không thì “Không đọc được từ dữ liệu”.
+5. Kiểm thử tự động bằng IPA giả lập (cần Node ≥ 20 và Python 3): `python3 tests/make_fake_ipas.py /tmp/fake_ipas && node tests/run_detect_tests.js /tmp/fake_ipas`. Lưu ý: IPA giả lập chỉ kiểm tra logic, không đảm bảo độ chính xác trên IPA thật.
+
 ## Kiểm tra Phase 1
 
 1. Phân tích IPA → chọn file `.ipa` thật → bấm **Bắt đầu phân tích** (không tự chạy khi chọn file).
@@ -33,7 +41,7 @@ Lưu ý: nếu IPA tải từ App Store còn mã hóa FairPlay (cryptid≠0), c�
 
 ## Kiến trúc
 
-Namespace toàn cục `window.IPAStudio`. Thứ tự nạp script: `logger → plist_parser → binary_reader → ipa_reader → worker_manager → state → ui → events → app`. Phân tích IPA chạy trong `js/workers/ipa.worker.js`; nếu Worker không có (vd mở bằng `file://`) thì tự chạy trên luồng chính và ghi cảnh báo. Chi tiết API: `INTERFACES.md`. Tiến độ: `HANDOFF.md`. Việc tiếp theo: `NEXT_TASK.md`.
+Namespace toàn cục `window.IPAStudio`. Thứ tự nạp script: `logger → plist_parser → binary_reader → detect_engine → ipa_reader → worker_manager → state → ui → events → app`. Phân tích IPA chạy trong `js/workers/ipa.worker.js`; nếu Worker không có (vd mở bằng `file://`) thì tự chạy trên luồng chính và ghi cảnh báo. Chi tiết API: `INTERFACES.md`. Tiến độ: `HANDOFF.md`. Việc tiếp theo: `NEXT_TASK.md`.
 
 - `State` giữ trạng thái; `UI.render` vẽ lại từ state; `Events` chỉ nối DOM → State.
 - Dữ liệu từ IPA luôn hiển thị bằng `textContent`, không `innerHTML`.

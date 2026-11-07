@@ -1,4 +1,4 @@
-# INTERFACES.md – API hiện tại (Phase 0)
+# INTERFACES.md – API hiện tại (Phase 0 → 2)
 
 Namespace: `window.IPAStudio` (gọi tắt NS). Chỉ liệt kê cái ĐÃ tồn tại. Cập nhật file này mỗi khi thêm/sửa chữ ký.
 
@@ -61,7 +61,7 @@ Events.bind()                  // gắn mọi listener DOM, gọi 1 lần ở bo
 Events.selectFile(file)        // reset session, kiểm tra đuôi .ipa, set status
 ```
 
-## NS.VERSION (js/app.js) = '0.1.0-phase0'
+## NS.VERSION (js/app.js) = '0.3.0-phase2'
 
 ## DOM id quan trọng
 #btn-start, #btn-cancel, #btn-clear, #btn-pick, #file-input, #dropzone, #file-info, #file-check, #progress-bar, #steps, #log-viewer, #stat-grid, #generic-views, #toasts.
@@ -125,3 +125,39 @@ Giao thức worker: main→`{type:'analyze',file,opts}`; worker→`{type:'step'|
 - `NS.VERSION = '0.2.0-phase1'`.
 - Cập nhật mục “Chưa tồn tại”: còn thiếu DetectEngine, Hash, Manifest, Report, Export và mọi module dump/phân tích khác.
 - DOM mới: #phase-note, #error-banner, #bundle-picker (#bundle-select), #app-detail, #progress.
+
+---
+# Bổ sung Phase 2 (Account 02)
+
+## NS.DetectEngine (js/modules/detect_engine.js)
+Dùng chung luồng chính + worker (bọc `root`). Phụ thuộc call-time vào `NS.IpaReader.readEntry` (chỉ trong `runProbes`).
+```
+DetectEngine.detect(ipaResult, probes?) -> EngineResult        // ĐỒNG BỘ, không I/O
+DetectEngine.planProbes(ipaResult)      -> [{kind, path}]      // path tương đối với appRoot
+DetectEngine.runProbes(file, ipaResult, zipEntries, hooks?:{isCancelled?}) -> Promise<Probe[]>
+   // zipEntries = entries GỐC của IpaReader.openZip (cần offset) – KHÔNG phải ipaResult.entries
+Probe = { kind:'unityfs'|'il2cpp_metadata'|'gdpc'|'rn_bundle'|'gm_data', path, matched:false|true|'hermes'|'metro'|'gen8'|'form', info:object|null, error?:string }
+   info: unityfs{signature,formatVersion,minPlayerVersion,unityRevision?}, il2cpp_metadata{metadataVersion}, gdpc{packFormat,version?}, rn_bundle{hermesBytecodeVersion?}
+DetectEngine.toReportFields(engineResult) -> { engine, engine_variant, engine_confidence, engine_status }   // phần engine của report.json
+DetectEngine.TIER = {strong:0.75, medium:0.45, weak:0.12}; MIN_CONFIDENCE = 0.2; ENGINE_NAMES:string[]
+
+EngineResult (= nội dung engine.json) = {
+  engine: 'Unity'|'Unreal Engine'|'Cocos2d-x / Cocos Creator'|'Godot'|'GameMaker'|'Defold'|'Flutter'|'React Native'|'Solar2D / Corona'|"Ren'Py"|'RPG Maker MV/MZ'|'Native iOS'|'Unknown',
+  variant: 'IL2CPP'|'Mono'|'Creator'|'Hermes'|'MV'|'MZ'|null,
+  confidence: 0..1, status: 'confirmed'|'probable'|'possible'|'unknown',
+  evidence: [{indicator, path, weight, tier:'strong'|'medium'|'weak', id}],
+  missing_indicators: string[], version: string|null, version_source: string|null,
+  analysis_branch: 'unity_il2cpp'|'unity_mono'|'unity_unresolved'|'unreal'|'cocos'|'godot'|'gamemaker'|'defold'|'flutter'|'react_native'|'solar2d'|'renpy'|'rpgmaker'|'native_ios'|'generic',
+  notes: string[], alternatives: [{engine, confidence, status}]
+}
+```
+Quy tắc đã cài: confidence = noisy-or các weight; `confirmed` cần ≥1 strong, ≥2 bằng chứng, confidence ≥ 0.85; `probable` = ≥1 strong hoặc ≥2 medium (trần 0.8); `possible` trần 0.45; confidence < 0.2 → Unknown. Native iOS không bao giờ confirmed (trần 0.6). `analysis_branch` chỉ là nhánh engine khi status là confirmed/probable; possible/unknown → `generic`. `version` chỉ lấy từ dữ liệu thật (UnityFS header, GDPC header), không đoán. Dấu hiệu cùng nguồn khai báo `skipIf` để không đếm hai lần.
+
+## Thay đổi ở module cũ
+- `IpaReader.analyze` → IpaResult có thêm `engine: EngineResult|null` và `engineProbes: Probe[]`; gọi `step('engine', ...)` sau bước plist. Lỗi detect chỉ thành warning + step engine `error`, không làm hỏng kết quả Phase 1.
+- `Events.applyResult`: `session.engine = {engine, variant, confidence, status, analysis_branch, version}`; `session.results.engine = EngineResult` (engine.json); `session.results.reportEngine = toReportFields(...)`.
+- `UI`: view `engine` không còn là view trống; thêm `renderEngine(session)` (nội bộ); stat dashboard “Engine phát hiện” = tên + biến thể + status.
+- `NS.VERSION = '0.3.0-phase2'`. Worker `importScripts` thêm `../modules/detect_engine.js` (trước ipa_reader.js). `index.html` thêm `<script src="js/modules/detect_engine.js">` sau binary_reader.js; thêm `#view-engine`, `#engine-empty`, `#engine-detail`.
+
+## Chưa tồn tại (đừng gọi)
+Hash, Manifest, Report, Export và mọi module quét/dump/phân tích khác (Phase 3+).

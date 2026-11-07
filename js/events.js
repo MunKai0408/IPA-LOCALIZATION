@@ -38,18 +38,20 @@
         version: r.app.version, build: r.app.build, minOS: r.app.minOS,
         deviceFamily: r.app.deviceFamily, architectures: r.architectures
       },
+      engine: r.engine ? { engine: r.engine.engine, variant: r.engine.variant, confidence: r.engine.confidence, status: r.engine.status,
+                           analysis_branch: r.engine.analysis_branch, version: r.engine.version } : null,
       stats: Object.assign({}, s.stats, { totalFiles: r.zip.fileCount }),
-      results: Object.assign({}, s.results, { ipa: r })
+      results: Object.assign({}, s.results, { ipa: r, engine: r.engine || null, reportEngine: r.engine ? NS.DetectEngine.toReportFields(r.engine) : null })
     });
     r.warnings.forEach(function (w) { /* đã log trong IpaReader qua hook */ });
-    L.success('Phase 1 hoàn tất: đã đọc cấu trúc IPA', { module: 'events', step: 'read', details: { bundleId: r.app.bundleId, files: r.zip.fileCount, arch: r.architectures } });
-    UI.toast('Đã đọc xong cấu trúc IPA', 'success');
+    L.success('Phase 1–2 hoàn tất: đã đọc cấu trúc IPA và nhận diện engine', { module: 'events', step: 'read', details: { bundleId: r.app.bundleId, files: r.zip.fileCount, arch: r.architectures } });
+    UI.toast(r.engine ? 'Engine: ' + r.engine.engine + (r.engine.variant ? ' ' + r.engine.variant : '') + ' (' + r.engine.status + ')' : 'Đã đọc xong cấu trúc IPA', r.engine && r.engine.status === 'unknown' ? 'warning' : 'success');
   }
 
   async function startAnalysis(bundle) {
     const s = S.get().session;
     if (!s.file || !s.fileCheck || !s.fileCheck.ok || s.status === 'running') return;
-    S.updateSession({ status: 'running', error: null, app: null, results: {}, stats: { totalFiles: null, fontCount: null, stringCount: null, localizationTables: null }, startedAt: new Date().toISOString(), completedAt: null, progress: 0 });
+    S.updateSession({ status: 'running', error: null, app: null, engine: null, results: {}, stats: { totalFiles: null, fontCount: null, stringCount: null, localizationTables: null }, startedAt: new Date().toISOString(), completedAt: null, progress: 0 });
     S.resetSteps();
     L.info('Bắt đầu phân tích', { module: 'events', step: 'read', details: { file: s.file.name, bundle: bundle || null } });
 

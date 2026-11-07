@@ -320,9 +320,9 @@
     if (scInfo && !(macho && macho.encrypted === false)) log('INFO', 'Có thư mục SC_Info (dấu hiệu IPA tải từ App Store)');
 
     step('plist', 'done', plistFormat === 'binary' ? 'plist nhị phân' : 'plist XML');
-    progress(1);
+    progress(0.85);
 
-    return {
+    const result = {
       fileName: file.name, ipaSize: file.size,
       zip: { entryCount: entries.length, fileCount: fileCount, totalCompressed: totalC, totalUncompressed: totalU,
              zip64: zip.zip64, unsafeEntries: unsafeCount, encryptedEntries: encCount, unsupportedMethodEntries: unsupportedCount },
@@ -333,8 +333,29 @@
       dataDir: dataDir ? { files: dataDir.files, bytes: dataDir.bytes } : null,
       hasScInfo: scInfo,
       entries: entries.map(function (e) { return { path: e.name, size: e.size, csize: e.csize, method: e.method, dir: e.dir, unsafe: e.unsafe, encrypted: e.encrypted }; }),
-      warnings: warnings, errors: errors
+      warnings: warnings, errors: errors,
+      engine: null, engineProbes: []
     };
+
+    /* --- Bước 3: nhận diện engine (Phase 2). Lỗi ở đây không làm hỏng kết quả Phase 1. --- */
+    step('engine', 'running', 'Nhận diện engine');
+    try {
+      if (!NS.DetectEngine) throw new IpaError('NO_DETECT_MODULE', 'Thiếu module detect_engine.js');
+      const probes = await NS.DetectEngine.runProbes(file, result, entries, { isCancelled: cancelled });
+      check();
+      const eng = NS.DetectEngine.detect(result, probes);
+      result.engineProbes = probes; result.engine = eng;
+      const label = eng.engine + (eng.variant ? ' ' + eng.variant : '');
+      log(eng.status === 'unknown' ? 'WARNING' : 'SUCCESS', 'Engine: ' + label + ' – ' + eng.status + ' (' + Math.round(eng.confidence * 100) + '%)',
+          { evidence: eng.evidence.length, branch: eng.analysis_branch, version: eng.version });
+      step('engine', 'done', label + ' · ' + eng.status);
+    } catch (e) {
+      if (e && e.code === 'CANCELLED') throw e;
+      warn('Nhận diện engine thất bại: ' + ((e && e.message) || e));
+      step('engine', 'error', (e && e.message) || 'Lỗi');
+    }
+    progress(1);
+    return result;
   }
 
   NS.IpaReader = { LIMITS: LIMITS, IpaError: IpaError, openZip: openZip, readEntry: readEntry, analyze: analyze };

@@ -6,7 +6,7 @@
   const VIEWS = {
     overview:     { title: 'Tổng quan',      icon: '▦' },
     analyze:      { title: 'Phân tích IPA',  icon: '⬆' },
-    engine:       { title: 'Engine',         icon: '⚙', phase: 2, empty: 'Chưa có kết quả nhận diện engine. Tải IPA ở mục “Phân tích IPA”.' },
+    engine:       { title: 'Engine',         icon: '⚙', phase: 2 },
     explorer:     { title: 'File Explorer',  icon: '🗂', phase: 3, empty: 'Chưa có danh sách file. Cây thư mục, magic bytes và manifest sẽ hiện ở đây sau khi quét.' },
     fonts:        { title: 'Font',           icon: 'Aa', phase: 5, empty: 'Chưa có dữ liệu font. Độ phủ tiếng Việt sẽ được kiểm tra trên font thực sự đọc được.' },
     text:         { title: 'Văn bản',        icon: '✎', phase: 6, empty: 'Chưa có chuỗi nào được trích xuất.' },
@@ -136,7 +136,7 @@
     setStat('appName', app.name);
     setStat('bundleId', app.bundleId);
     setStat('version', app.version ? app.version + (app.build ? ' (' + app.build + ')' : '') : null);
-    setStat('engine', s.engine ? s.engine.engine + (s.engine.variant ? ' ' + s.engine.variant : '') : null);
+    setStat('engine', s.engine ? (s.engine.engine === 'Unknown' ? 'Unknown (chưa đủ bằng chứng)' : s.engine.engine + (s.engine.variant ? ' ' + s.engine.variant : '') + ' · ' + s.engine.status) : null);
     setStat('arch', app.architectures && app.architectures.length ? app.architectures.join(', ') : null);
     setStat('ipaSize', s.file ? formatBytes(s.file.size) : null);
     setStat('totalFiles', s.stats.totalFiles);
@@ -169,6 +169,7 @@
     $('#phase-note').hidden = s.status !== 'read_done';
     renderError(s);
     renderDetails(s);
+    renderEngine(s);
   }
 
   /* ---------- Lỗi + chi tiết ứng dụng ---------- */
@@ -242,6 +243,47 @@
         h('ul', { class: 'plain-list' }, ipa.warnings.map(function (w) { return h('li', { text: w }); }))
       ]));
     }
+  }
+
+  /* ---------- View Engine (Phase 2) ---------- */
+  const ENGINE_STATUS = {
+    confirmed: ['Xác nhận (confirmed)', 'success'], probable: ['Nhiều khả năng (probable)', 'info'],
+    possible: ['Có thể (possible)', 'warning'], unknown: ['Không xác định (unknown)', 'danger']
+  };
+  let lastEngine = null;
+  function renderEngine(s) {
+    const res = (s.results && s.results.engine) || null;
+    if (res === lastEngine) return;
+    lastEngine = res;
+    const box = $('#engine-detail'), empty = $('#engine-empty');
+    if (!box || !empty) return;
+    box.replaceChildren(); box.hidden = !res; empty.hidden = !!res;
+    if (!res) return;
+
+    const st = ENGINE_STATUS[res.status] || ENGINE_STATUS.unknown;
+    const info = h('dl', { class: 'kv' });
+    kvRow(info, 'Engine', res.engine);
+    kvRow(info, 'Biến thể', res.variant || 'Chưa xác định');
+    info.appendChild(h('dt', { text: 'Trạng thái' }));
+    info.appendChild(h('dd', {}, [h('span', { class: 'badge ' + st[1], text: st[0] })]));
+    kvRow(info, 'Độ tin cậy', Math.round(res.confidence * 100) + '%');
+    kvRow(info, 'Phiên bản engine', res.version ? res.version + ' (đọc từ ' + res.version_source + ')' : 'Không đọc được từ dữ liệu');
+    kvRow(info, 'Nhánh phân tích', res.analysis_branch);
+    box.appendChild(h('div', { class: 'card' }, [h('h2', { class: 'section-title', text: 'Kết quả nhận diện' }), info]));
+
+    const evCard = h('div', { class: 'card' }, [h('h2', { class: 'section-title', text: 'Bằng chứng (' + res.evidence.length + ')' })]);
+    if (res.evidence.length) {
+      evCard.appendChild(h('ul', { class: 'plain-list' }, res.evidence.map(function (e) {
+        return h('li', { text: '[' + e.tier + ' ' + e.weight + '] ' + e.indicator + ' — ' + e.path });
+      })));
+    } else evCard.appendChild(h('p', { class: 'dim', text: 'Không có bằng chứng nào đạt ngưỡng.' }));
+    box.appendChild(evCard);
+
+    box.appendChild(h('div', { class: 'card' }, [
+      listBlock('Dấu hiệu còn thiếu (missing_indicators)', res.missing_indicators),
+      listBlock('Ghi chú', res.notes),
+      listBlock('Engine khác có dấu hiệu', res.alternatives.map(function (a) { return a.engine + ' – ' + a.status + ' (' + Math.round(a.confidence * 100) + '%)'; }))
+    ]));
   }
 
   /* ---------- Log viewer ---------- */
