@@ -19,6 +19,9 @@ files = {  # tên -> (dữ liệu, kiểu nén)
   'Frameworks/UnityFramework.framework/UnityFramework': (b'\xcf\xfa\xed\xfe' + b'x' * 500, zipfile.ZIP_DEFLATED),
   'Data/Managed/Assembly-CSharp.dll': (b'MZ' + b'x' * 200, zipfile.ZIP_DEFLATED),
   'content/=evil name.csv': (b'a,b\n1,2\n', zipfile.ZIP_DEFLATED),               # tên bắt đầu bằng '=' (CSV injection)
+  'dup/a.bin': (b'hello dup' * 50, zipfile.ZIP_DEFLATED),
+  'dup/sub/b.bin': (b'hello dup' * 50, zipfile.ZIP_DEFLATED),
+  'dup/c.bin': (b'hello dup' * 50, zipfile.ZIP_STORED),
   'big/zeros.bin': (b'\0' * (70 * 1024 * 1024), zipfile.ZIP_DEFLATED),           # > 64 MB: chỉ SHA-1
 }
 exp = {}

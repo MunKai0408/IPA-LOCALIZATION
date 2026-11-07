@@ -288,56 +288,117 @@
   }
 
   /* ---------- View File Explorer (Phase 3) ---------- */
-  const EX = { manifest: null, filtered: [], page: 0, size: 100, bound: false };
-  function exFilter() {
-    const m = EX.manifest; if (!m) return;
-    const q = $('#ex-search').value.trim().toLowerCase(), t = $('#ex-type').value, pr = $('#ex-priority').checked;
-    EX.filtered = m.rows.filter(function (r) {
-      return (!t || r.detected_type === t) && (!pr || r.priority) && (!q || r.relative_path.toLowerCase().indexOf(q) >= 0);
+  const EX = { manifest: null, tree: null, dir: '', page: 0, size: 100, bound: false, list: [] };
+
+  function buildTree(rows) {
+    const nodes = new Map();
+    const node = function (p) { let n = nodes.get(p); if (!n) { n = { dirs: new Map(), files: [] }; nodes.set(p, n); } return n; };
+    node('');
+    rows.forEach(function (r) {
+      const parts = r.relative_path.split('/');
+      for (let i = 0; i < parts.length - 1; i++) {
+        const parent = parts.slice(0, i).join('/'), cur = node(parent).dirs.get(parts[i]) || { count: 0, bytes: 0 };
+        cur.count++; cur.bytes += r.file_size; node(parent).dirs.set(parts[i], cur);
+        node(parts.slice(0, i + 1).join('/'));
+      }
+      node(parts.slice(0, -1).join('/')).files.push(r);
     });
-    EX.page = 0; exPage();
+    return nodes;
   }
-  function exPage() {
-    const tbl = $('#ex-table'), total = EX.filtered.length, from = EX.page * EX.size, to = Math.min(total, from + EX.size);
-    tbl.replaceChildren();
-    const head = h('tr', {}, ['Đường dẫn', 'Kích thước', 'Loại', 'Định dạng', 'Magic', 'SHA-1', 'Engine', 'Trạng thái'].map(function (t) { return h('th', { text: t }); }));
-    tbl.appendChild(h('thead', {}, [head]));
-    tbl.appendChild(h('tbody', {}, EX.filtered.slice(from, to).map(function (r) {
-      return h('tr', {}, [
-        h('td', { class: 'path', text: r.relative_path }), h('td', { text: formatBytes(r.file_size) }), h('td', { text: r.detected_type }),
-        h('td', { text: r.detected_format, title: r.error || '' }), h('td', { text: r.magic_bytes }), h('td', { text: r.sha1 ? r.sha1.slice(0, 12) + '…' : '—', title: r.sha1 }),
-        h('td', { text: r.engine_related }), h('td', { text: r.extraction_status })
-      ]);
-    })));
-    $('#ex-count').textContent = total ? 'Hiển thị ' + (from + 1) + '–' + to + ' / ' + total + ' file' : 'Không có file khớp bộ lọc';
+  function exSorter(kind) {
+    return kind === 'size' ? function (a, b) { return b.file_size - a.file_size; }
+      : kind === 'type' ? function (a, b) { return a.detected_type.localeCompare(b.detected_type) || a.relative_path.localeCompare(b.relative_path); }
+      : function (a, b) { return a.relative_path.localeCompare(b.relative_path); };
+  }
+  function exFiltersActive() { return !!($('#ex-search').value.trim() || $('#ex-type').value || $('#ex-priority').checked); }
+  function exCell(text, props) { return h('td', Object.assign({ text: text }, props || {})); }
+
+  function exRender() {
+    const m = EX.manifest; if (!m) return;
+    const flat = $('#ex-mode').value === 'flat' || exFiltersActive(), sort = exSorter($('#ex-sort').value);
+    const tbl = $('#ex-table'), crumb = $('#ex-crumb');
+    crumb.replaceChildren();
+    let entries; // {kind:'up'|'dir'|'file', ...}
+    if (flat) {
+      const q = $('#ex-search').value.trim().toLowerCase(), t = $('#ex-type').value, pr = $('#ex-priority').checked;
+      entries = m.rows.filter(function (r) { return (!t || r.detected_type === t) && (!pr || r.priority) && (!q || r.relative_path.toLowerCase().indexOf(q) >= 0); })
+        .sort(sort).map(function (r) { return { kind: 'file', row: r }; });
+      if ($('#ex-mode').value !== 'flat') crumb.appendChild(h('span', { class: 'badge', text: 'Đang lọc: hiển thị danh sách phẳng' }));
+    } else {
+      const parts = EX.dir ? EX.dir.split('/') : [];
+      const mk = function (label, path) { const b = h('button', { class: 'btn', type: 'button', text: label }); b.addEventListener('click', function () { EX.dir = path; EX.page = 0; exRender(); }); return b; };
+      crumb.appendChild(mk('Gốc .app', ''));
+      parts.forEach(function (p, i) { crumb.appendChild(mk(p, parts.slice(0, i + 1).join('/'))); });
+      const n = EX.tree.get(EX.dir) || { dirs: new Map(), files: [] };
+      entries = [];
+      if (EX.dir) entries.push({ kind: 'up' });
+      Array.from(n.dirs.keys()).sort().forEach(function (k) { entries.push({ kind: 'dir', name: k, info: n.dirs.get(k) }); });
+      n.files.slice().sort(sort).forEach(function (r) { entries.push({ kind: 'file', row: r }); });
+    }
+    EX.list = entries;
+    const total = entries.length, from = EX.page * EX.size, to = Math.min(total, from + EX.size);
+    tbl.replaceChildren(h('thead', {}, [h('tr', {}, ['Tên / đường dẫn', 'Kích thước', 'Loại', 'Định dạng', 'Magic', 'SHA-1', 'Engine', 'Trạng thái'].map(function (t) { return h('th', { text: t }); }))]));
+    const tb = h('tbody', {});
+    entries.slice(from, to).forEach(function (en) {
+      let tr;
+      if (en.kind === 'up') {
+        tr = h('tr', {}, [exCell('📁 .. (lên một cấp)', { class: 'path' })]);
+        tr.addEventListener('click', function () { EX.dir = EX.dir.split('/').slice(0, -1).join('/'); EX.page = 0; exRender(); });
+      } else if (en.kind === 'dir') {
+        tr = h('tr', {}, [exCell('📁 ' + en.name + '/', { class: 'path' }), exCell(formatBytes(en.info.bytes)), exCell(en.info.count + ' file'), exCell(''), exCell(''), exCell(''), exCell(''), exCell('')]);
+        tr.addEventListener('click', function () { EX.dir = EX.dir ? EX.dir + '/' + en.name : en.name; EX.page = 0; exRender(); });
+      } else {
+        const r = en.row;
+        tr = h('tr', {}, [exCell(flat ? r.relative_path : r.file_name, { class: 'path' }), exCell(formatBytes(r.file_size)), exCell(r.detected_type), exCell(r.detected_format, { title: r.error || '' }),
+          exCell(r.magic_bytes), exCell(r.sha1 ? r.sha1.slice(0, 12) + '…' : '—', { title: r.sha1 }), exCell(r.engine_related), exCell(r.extraction_status + (r.duplicate_of ? ' · trùng' : ''))]);
+        tr.addEventListener('click', function () { exDetail(r); });
+      }
+      tr.style.cursor = 'pointer'; tb.appendChild(tr);
+    });
+    tbl.appendChild(tb);
+    $('#ex-count').textContent = total ? 'Hiển thị ' + (from + 1) + '–' + to + ' / ' + total + (flat ? ' file' : ' mục trong thư mục này') : 'Không có mục nào';
     $('#ex-prev').disabled = EX.page === 0; $('#ex-next').disabled = to >= total;
   }
+
+  function exDetail(r) {
+    const box = $('#ex-detail'); box.hidden = false; box.replaceChildren(h('h2', { class: 'section-title', text: 'Chi tiết file' }));
+    const dl = h('dl', { class: 'kv' });
+    EX.manifest.columns.forEach(function (c) { kvRow(dl, c, r[c] === '' || r[c] == null ? '—' : String(r[c])); });
+    box.appendChild(dl);
+  }
+
   function renderExplorer(s) {
     const m = (s.results && s.results.manifest) || null;
     if (m === EX.manifest) return;
-    EX.manifest = m;
+    EX.manifest = m; EX.dir = ''; EX.page = 0;
     const box = $('#explorer-detail'), empty = $('#explorer-empty');
     if (!box || !empty) return;
-    box.hidden = !m; empty.hidden = !!m;
+    box.hidden = !m; empty.hidden = !!m; $('#ex-detail').hidden = true;
     if (!m) return;
+    EX.tree = buildTree(m.rows);
     const sm = m.summary, sum = $('#explorer-summary');
     sum.replaceChildren(h('h2', { class: 'section-title', text: 'Tóm tắt quét' }));
     const dl = h('dl', { class: 'kv' });
     kvRow(dl, 'Tổng số file', String(sm.totalFiles)); kvRow(dl, 'Tổng dung lượng giải nén', formatBytes(sm.totalBytes));
     kvRow(dl, 'Chế độ', m.options.hashMode === 'standard' ? 'Đầy đủ (SHA-1 ' + sm.hashed + ' file, SHA-256 ' + sm.sha256Hashed + ' file)' : 'Nhanh (chưa băm)');
     kvRow(dl, 'File ưu tiên', String(sm.priorityFiles)); kvRow(dl, 'Đuôi ≠ nội dung', String(sm.mismatches));
-    kvRow(dl, 'File nén/đóng gói (chỉ ghi nhận header)', String(sm.archives)); kvRow(dl, 'File lỗi/không đọc được', String(sm.errors));
+    kvRow(dl, 'File nén/đóng gói (chỉ ghi header)', String(sm.archives)); kvRow(dl, 'File lỗi/không đọc được', String(sm.errors));
+    if (sm.suspiciousRatio) kvRow(dl, 'Tỉ lệ nén bất thường', String(sm.suspiciousRatio));
+    kvRow(dl, 'File trùng nội dung', m.options.hashMode === 'standard' ? sm.duplicates.extraCopies + ' bản dư trong ' + sm.duplicates.groups + ' nhóm (lãng phí ' + formatBytes(sm.duplicates.wastedBytes) + ')' : 'Chưa xác định (cần chế độ Đầy đủ)');
     sum.appendChild(dl);
     sum.appendChild(h('div', { class: 'chips' }, Object.keys(sm.byType).sort().map(function (k) { return h('span', { class: 'badge', text: k + ': ' + sm.byType[k] }); })));
+    if (sm.duplicates.top.length) sum.appendChild(listBlock('Nhóm trùng lớn nhất', sm.duplicates.top.map(function (g) { return g.count + '× ' + formatBytes(g.size) + ' — ' + g.paths.join(', ') + (g.count > g.paths.length ? ', …' : ''); })));
     const sel = $('#ex-type'); sel.replaceChildren(h('option', { value: '', text: 'Mọi loại' }));
     Object.keys(sm.byType).sort().forEach(function (k) { sel.appendChild(h('option', { value: k, text: k + ' (' + sm.byType[k] + ')' })); });
     if (!EX.bound) {
       EX.bound = true;
-      $('#ex-search').addEventListener('input', exFilter); sel.addEventListener('change', exFilter); $('#ex-priority').addEventListener('change', exFilter);
-      $('#ex-prev').addEventListener('click', function () { if (EX.page > 0) { EX.page--; exPage(); } });
-      $('#ex-next').addEventListener('click', function () { if ((EX.page + 1) * EX.size < EX.filtered.length) { EX.page++; exPage(); } });
+      const re = function () { EX.page = 0; exRender(); };
+      ['#ex-search'].forEach(function (id) { $(id).addEventListener('input', re); });
+      ['#ex-type', '#ex-priority', '#ex-mode', '#ex-sort'].forEach(function (id) { $(id).addEventListener('change', re); });
+      $('#ex-prev').addEventListener('click', function () { if (EX.page > 0) { EX.page--; exRender(); } });
+      $('#ex-next').addEventListener('click', function () { if ((EX.page + 1) * EX.size < EX.list.length) { EX.page++; exRender(); } });
     }
-    exFilter();
+    exRender();
   }
 
   /* ---------- Log viewer ---------- */

@@ -15,6 +15,8 @@ Không cần cài đặt hay build. Code dùng script thường (không ES modul
 
 1. Ở “Phân tích IPA” chọn **Chế độ quét file** (Tự động / Đầy đủ / Nhanh) rồi bấm Bắt đầu. Bước **Quét file** chuyển Xong.
 2. Mục **File Explorer**: tóm tắt (số file, loại, file ưu tiên, đuôi ≠ nội dung, file nén chỉ ghi header, file lỗi), lọc theo loại/đường dẫn/“Chỉ file ưu tiên”, phân trang.
+2b. Explorer mặc định **Xem theo thư mục**: bấm thư mục để đi vào, breadcrumb để quay lại, bấm một file để xem toàn bộ thông tin (SHA đầy đủ, header archive, lỗi). Bật tìm kiếm/lọc loại/“Chỉ file ưu tiên” thì tự chuyển sang danh sách phẳng; có thể sắp xếp theo đường dẫn, kích thước, loại.
+2c. Chế độ Đầy đủ báo **file trùng nội dung** (cột `duplicate_of`, số bản dư và dung lượng lãng phí); chế độ Nhanh không báo được vì chưa băm.
 3. Chế độ **Nhanh** chỉ đọc đầu file để phân loại, KHÔNG băm (cột SHA trống, trạng thái `head_only`). Chế độ **Đầy đủ** băm SHA-1 mọi file, SHA-256 file ≤ 64 MB và kiểm CRC32; với IPA lớn trên điện thoại sẽ chậm.
 4. Nút **Tải manifest.csv**: UTF-8 có BOM, ô bắt đầu bằng `= + - @` được thêm dấu `'` để tránh formula injection khi mở bằng Excel.
 5. File nén/đóng gói (ZIP, gzip, LZ4, UnityFS, PCK, PAK…) chỉ được ghi nhận header, **không giải nén**.

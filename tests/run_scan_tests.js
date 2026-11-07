@@ -14,7 +14,7 @@ const hooks = { step() {}, progress() {}, log() {} };
 
   // --- chế độ standard ---
   let r = await NS.IpaReader.analyze(file, { hashMode: 'standard' }, hooks);
-  let mf = r.manifest; ok(!!mf, 'có manifest');
+  let mf = r.manifest; const mf0 = mf; ok(!!mf, 'có manifest');
   const by = {}; mf.rows.forEach(function (x) { by[x.relative_path] = x; });
   Object.keys(exp).forEach(function (k) {
     const row = by[k]; ok(!!row, 'thiếu hàng ' + k); if (!row) return;
@@ -38,6 +38,12 @@ const hooks = { step() {}, progress() {}, log() {} };
   ok(unsafe.length === 1 && unsafe[0].sha1 === '', 'đường dẫn không an toàn bị từ chối, không băm');
   ok(mf.summary.totalFiles === Object.keys(exp).length + 2, 'tổng file = ' + mf.summary.totalFiles); // + Info.plist + ../escape.txt
 
+  // --- file trùng nội dung ---
+  ok(by['dup/a.bin'].duplicate_of === '' && by['dup/sub/b.bin'].duplicate_of === 'dup/a.bin' && by['dup/c.bin'].duplicate_of === 'dup/a.bin', 'duplicate_of trỏ về bản đầu tiên');
+  const dp = mf.summary.duplicates, sz = exp['dup/a.bin'].size;
+  ok(dp.groups === 1 && dp.extraCopies === 2 && dp.wastedBytes === 2 * sz && dp.top[0].count === 3, 'tổng hợp file trùng: ' + JSON.stringify(dp).slice(0, 120));
+  ok(by['text/empty.txt'].duplicate_of === '', 'file rỗng không bị tính là trùng');
+
   // --- CSV ---
   const csv = NS.FileScanner.toCsv(mf), lines = csv.replace(/^\uFEFF/, '').split('\r\n');
   ok(lines[0] === NS.FileScanner.COLUMNS.join(','), 'header CSV');
@@ -52,6 +58,8 @@ const hooks = { step() {}, progress() {}, log() {} };
   const f2 = {}; mf.rows.forEach(function (x) { f2[x.relative_path] = x; });
   ok(f2['icon.png'].detected_type === 'Image' && f2['icon.png'].sha1 === '' && f2['icon.png'].extraction_status === 'head_only', 'fast vẫn phân loại, status head_only');
   ok(f2['big/zeros.bin'].sha1 === '', 'fast: không băm file lớn');
+  ok(mf.summary.duplicates.groups === 0 && f2['dup/c.bin'].duplicate_of === '', 'fast: không báo trùng (chưa băm)');
+  ok(mf.rows.map(function (x) { return x.relative_path; }).join('|') === mf0.rows.map(function (x) { return x.relative_path; }).join('|'), 'thứ tự hàng giữ nguyên dù xử lý song song');
 
   // --- auto: IPA nhỏ → standard ---
   r = await NS.IpaReader.analyze(file, {}, hooks);

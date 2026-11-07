@@ -13,11 +13,15 @@ Vòng quay: 01 → 02 → … → 10 → 01. Ghi rõ số tài khoản đầu m�
 Tạo: js/modules/{detect_engine,hash,magic_bytes,archive_scanner,file_scanner}.js, tests/{make_fake_ipas.py,run_detect_tests.js,make_scan_ipa.py,run_scan_tests.js}.
 Sửa: js/ipa_reader.js (bước engine + scan, streamEntry), js/workers/ipa.worker.js, index.html (script, #view-engine, #view-explorer, #hash-mode), js/ui.js (renderEngine, renderExplorer), js/events.js, js/app.js (VERSION 0.4.0-phase3), css/analyzer.css, README.md, INTERFACES.md, HANDOFF.md, NEXT_TASK.md.
 
+## Nâng cấp Phase 3 đợt 2 (Account 02)
+Hash nhanh hơn (đã kiểm lại đúng), quét song song file nhỏ, phát hiện file trùng (`duplicate_of`, summary.duplicates), cờ tỉ lệ nén bất thường, Explorer duyệt theo thư mục + sắp xếp + chi tiết file. Chi tiết trong INTERFACES.md (mục “Nâng cấp Phase 3”).
+**Không đo được lợi ích song song hóa:** trong Node, quét 20.000 file nhỏ chỉ 4,0 s → 3,8 s (fast) và 2,6 s → 2,4 s (standard); chưa biết kết quả trên Safari/iPhone thật. Nếu IPA thật vẫn chậm, đo lại bằng log trước khi tối ưu tiếp.
+
 ## Kiểm thử đã chạy
 - `node tests/run_detect_tests.js /tmp/fake_ipas` (sau `python3 tests/make_fake_ipas.py /tmp/fake_ipas`): 22 IPA, 359 kiểm tra đạt.
-- `python3 tests/make_scan_ipa.py /tmp/fake_ipas && node tests/run_scan_tests.js /tmp/fake_ipas`: 92 kiểm tra đạt: SHA-1/SHA-256 khớp hashlib (kể cả file 70 MB chỉ SHA-1), CRC, phân loại ~12 loại, đuôi≠nội dung, file rỗng, đường dẫn `../` bị từ chối, CSV (BOM, escape, chống formula injection), fast/standard/auto, hủy giữa chừng.
+- `python3 tests/make_scan_ipa.py /tmp/fake_ipas && node tests/run_scan_tests.js /tmp/fake_ipas`: 112 kiểm tra đạt (thêm file trùng, thứ tự hàng sau khi song song): SHA-1/SHA-256 khớp hashlib (kể cả file 70 MB chỉ SHA-1), CRC, phân loại ~12 loại, đuôi≠nội dung, file rỗng, đường dẫn `../` bị từ chối, CSV (BOM, escape, chống formula injection), fast/standard/auto, hủy giữa chừng.
 - Hash: 15 độ dài × 2 thuật toán, chia chunk bất kỳ, khớp `crypto` của Node; CRC32 vector chuẩn.
-- Chromium headless qua http (có Worker) với IPA giả lập: dashboard (Unity · confirmed, 15 file), Explorer, lọc, tải được `manifest.csv` đúng header; không lỗi JS, không request ngoài. (Số dòng CSV trong trình duyệt chưa đếm lại; số dòng đã kiểm trong test Node.)
+- Chromium headless qua http (có Worker) với IPA giả lập: duyệt thư mục + breadcrumb, chi tiết file, sắp xếp, lọc, thẻ file trùng đều chạy, không lỗi JS; dashboard (Unity · confirmed, 15 file), Explorer, lọc, tải được `manifest.csv` đúng header; không lỗi JS, không request ngoài. (Số dòng CSV trong trình duyệt chưa đếm lại; số dòng đã kiểm trong test Node.)
 **Chưa kiểm thử:** IPA thật (mọi engine), tốc độ băm trên iPhone/Safari thật với IPA 1.2 GB, bộ nhớ khi ~100k+ file, ZIP64 thật, chế độ file://. Dữ liệu giả lập do chính Account 02 tạo nên chỉ chứng minh logic, không chứng minh độ chính xác trên IPA thật.
 
 ## Quyết định kiến trúc (không đổi khi bàn giao)

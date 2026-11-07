@@ -193,3 +193,11 @@ Chế độ: `standard` = đọc đầy đủ, SHA-1 mọi file, SHA-256 chỉ f
 
 ## Chưa tồn tại (đừng gọi)
 Giải nén archive lồng nhau, phân tích metadata IL2CPP (Phase 4), font (5), chuỗi/localization (6), runtime import (7), template (8), Packager/Report/Export (9), engine khác (10).
+
+---
+# Nâng cấp Phase 3 (Account 02, đợt 2)
+- `Row` có thêm cột **`duplicate_of`** (đứng sau `sha256`): đường dẫn bản đầu tiên có cùng SHA-1 + kích thước; '' nếu không trùng. Chỉ có ở chế độ `standard` (fast không băm nên không biết). File rỗng không bao giờ được tính là trùng.
+- `summary` có thêm `suspiciousRatio` (số file ≥100 MB có tỉ lệ nén >200:1, vẫn đọc có giới hạn theo size khai báo, ghi chú vào cột `error`) và `duplicates:{groups, extraCopies, wastedBytes, top:[{sha1,size,count,paths[≤3]}]}` (top 10 theo dung lượng lãng phí).
+- `options` có thêm `concurrency`. `FileScanner.scan`: file ≤ 4 MiB (và mọi file ở chế độ fast) chạy song song 8 luồng, file lớn hơn tuần tự; hàng trong `rows` luôn đúng thứ tự gốc, summary tính sau khi xong nên không phụ thuộc thứ tự hoàn thành.
+- `Hash`: API không đổi; SHA-1/SHA-256 đọc byte trực tiếp, CRC32 slicing-by-4 (đo trong Node: SHA-1 156→206, SHA-256 96→139, CRC32 204→512 MB/s; đã đối chiếu lại `crypto`).
+- UI Explorer: chế độ **Xem theo thư mục** (breadcrumb, thư mục tổng hợp số file/dung lượng, “..”) hoặc **Danh sách phẳng**; bật bộ lọc/tìm kiếm thì tự chuyển sang danh sách phẳng; sắp xếp theo đường dẫn/kích thước/loại; bấm một file để xem toàn bộ cột (`#ex-detail`); thẻ tóm tắt hiển thị file trùng. Ids mới: `#ex-mode`, `#ex-sort`, `#ex-crumb`, `#ex-detail`.

@@ -13,7 +13,7 @@
   /* Khung chung: gom dữ liệu thành khối 64 byte, gọi block(view, offset). */
   function Hasher(init, block, bigEndianLen) {
     this.h = init; this.block = block; this.buf = new Uint8Array(64); this.bl = 0; this.len = 0; this.done = false;
-    this.dv = new DataView(this.buf.buffer);
+    this.dv = new DataView(this.buf.buffer);   // chỉ dùng để ghi độ dài ở cuối
   }
   Hasher.prototype.update = function (data) {
     if (this.done) throw new Error('đã kết thúc');
@@ -21,12 +21,9 @@
     if (this.bl) {
       const take = Math.min(64 - this.bl, n);
       this.buf.set(data.subarray(0, take), this.bl); this.bl += take; i = take;
-      if (this.bl === 64) { this.block(this.h, this.dv, 0); this.bl = 0; }
+      if (this.bl === 64) { this.block(this.h, this.buf, 0); this.bl = 0; }
     }
-    if (i + 64 <= n) {
-      const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
-      for (; i + 64 <= n; i += 64) this.block(this.h, dv, i);
-    }
+    for (; i + 64 <= n; i += 64) this.block(this.h, data, i);
     if (i < n) { this.buf.set(data.subarray(i), 0); this.bl = n - i; }
   };
   Hasher.prototype.finish = function (words) {
@@ -34,18 +31,18 @@
     this.done = true;
     const bits = this.len * 8, buf = this.buf;
     buf[this.bl++] = 0x80;
-    if (this.bl > 56) { buf.fill(0, this.bl, 64); this.block(this.h, this.dv, 0); this.bl = 0; }
+    if (this.bl > 56) { buf.fill(0, this.bl, 64); this.block(this.h, buf, 0); this.bl = 0; }
     buf.fill(0, this.bl, 56);
     this.dv.setUint32(56, Math.floor(bits / 4294967296), false);
     this.dv.setUint32(60, bits >>> 0, false);
-    this.block(this.h, this.dv, 0);
+    this.block(this.h, buf, 0);
   };
 
   /* ---- SHA-1 ---- */
   const w1 = new Uint32Array(80);
-  function sha1Block(h, dv, o) {
+  function sha1Block(h, u, o) {
     const w = w1;
-    for (let i = 0; i < 16; i++) w[i] = dv.getUint32(o + i * 4, false);
+    for (let i = 0, j = o; i < 16; i++, j += 4) w[i] = (u[j] << 24) | (u[j + 1] << 16) | (u[j + 2] << 8) | u[j + 3];
     for (let i = 16; i < 80; i++) { const x = w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16]; w[i] = (x << 1) | (x >>> 31); }
     let a = h[0], b = h[1], c = h[2], d = h[3], e = h[4];
     for (let i = 0; i < 80; i++) {
@@ -66,9 +63,9 @@
   const K256 = new Uint32Array(primes.map(function (p) { return frac32(Math.cbrt(p)); }));
   const H256 = primes.slice(0, 8).map(function (p) { return frac32(Math.sqrt(p)); });
   const w2 = new Uint32Array(64);
-  function sha256Block(h, dv, o) {
+  function sha256Block(h, u, o) {
     const w = w2;
-    for (let i = 0; i < 16; i++) w[i] = dv.getUint32(o + i * 4, false);
+    for (let i = 0, j = o; i < 16; i++, j += 4) w[i] = (u[j] << 24) | (u[j + 1] << 16) | (u[j + 2] << 8) | u[j + 3];
     for (let i = 16; i < 64; i++) {
       const x = w[i - 15], y = w[i - 2];
       const s0 = ((x >>> 7) | (x << 25)) ^ ((x >>> 18) | (x << 14)) ^ (x >>> 3);
@@ -89,8 +86,9 @@
   }
 
   /* ---- CRC32 ---- */
-  const CRC_T = new Uint32Array(256);
+  const CRC_T = new Uint32Array(1024);   // slicing-by-4: 4 bảng × 256
   for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; CRC_T[n] = c >>> 0; }
+  for (let n = 0; n < 256; n++) for (let k = 1; k < 4; k++) { const p = CRC_T[(k - 1) * 256 + n]; CRC_T[k * 256 + n] = (CRC_T[p & 0xFF] ^ (p >>> 8)) >>> 0; }
 
   function create(algo) {
     if (algo === 'sha1') {
@@ -104,7 +102,14 @@
     if (algo === 'crc32') {
       let c = 0xFFFFFFFF;
       return {
-        update: function (d) { for (let i = 0; i < d.length; i++) c = CRC_T[(c ^ d[i]) & 0xFF] ^ (c >>> 8); },
+        update: function (d) {
+          let i = 0; const n = d.length;
+          for (; i + 4 <= n; i += 4) {
+            c ^= d[i] | (d[i + 1] << 8) | (d[i + 2] << 16) | (d[i + 3] << 24);
+            c = CRC_T[768 + (c & 0xFF)] ^ CRC_T[512 + ((c >>> 8) & 0xFF)] ^ CRC_T[256 + ((c >>> 16) & 0xFF)] ^ CRC_T[c >>> 24];
+          }
+          for (; i < n; i++) c = CRC_T[(c ^ d[i]) & 0xFF] ^ (c >>> 8);
+        },
         hex: function () { return ('00000000' + ((c ^ 0xFFFFFFFF) >>> 0).toString(16)).slice(-8); },
         value: function () { return (c ^ 0xFFFFFFFF) >>> 0; }
       };
