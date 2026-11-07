@@ -102,3 +102,6 @@ Công cụ chỉ phân tích tĩnh. Trình duyệt không thể đọc RAM hay h
 ## Thư viện ngoài
 
 Không dùng. ZIP được đọc bằng parser tự viết + `DecompressionStream('deflate-raw')` của trình duyệt (Safari 16.4+, Chrome 80+, Firefox 113+).
+
+## Cập nhật 0.10.0 (Phase 5, sub-phase 5.2a): parser UnityFS (container)
+Đọc header, bảng block/node của AssetBundle UnityFS (LZ4/LZ4HC/LZMA/không nén), liệt kê node và giải nén được nội dung từng node (`NS.UnityFS.readNode`). Thẻ “AssetBundle UnityFS” nằm trong view Unity / Metadata; tải `unityfs_index.json`. **Chưa** parse SerializedFile nên chưa biết bên trong có TextAsset/Font/TMP hay không. Mới kiểm bằng bundle giả lập, chưa kiểm bundle Unity thật. Test: `python3 tests/make_unityfs_ipas.py DIR && node tests/run_unityfs_tests.js DIR`.

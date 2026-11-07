@@ -400,3 +400,42 @@ FontsResult (= results.fonts) = { schema:'fonts_discovery/1', sub_phase:'5.1', s
 
 ## Chưa tồn tại (đừng gọi)
 Đóng gói `Fonts/` vào ZIP (Phase 9); `Fonts/vi_coverage.json`, `missing_characters.txt`, `character_coverage.json` (5.3); family/glyph (5.2).
+
+
+---
+# Bổ sung Phase 5 – SUB-PHASE 5.2a UnityFS container parser (Account 06)
+
+## NS.UnityFS (js/modules/unity_fs.js) – Worker + luồng chính. Nạp SAU font_dump.js, TRƯỚC ipa_reader.js (index.html + worker importScripts đã cập nhật)
+```
+UnityFS.parseHeader(bytes) -> {ok, code?:'TOO_SHORT'|'OLD_FORMAT'|'BAD_MAGIC'|'BAD_HEADER'|'UNKNOWN_VERSION', error?, signature, version, min_player_version, unity_revision, size, compressed_info_size, uncompressed_info_size, flags, compression, combined, info_at_end, padding_flag, unknown_flag_bits, header_end}   // THUẦN; version hỗ trợ 6..8
+UnityFS.parseInfo(decompressedBytes) -> {ok, error?, blocks:[{index,uncompressed_size,compressed_size,flags,compression,streamed}], nodes:[{index,path,offset,size,flags,is_serialized(flags&4),unsafe_path}], consumed, hash_hex, problems[]}   // THUẦN
+UnityFS.open(bytes, fileSize?) -> Bundle   // THUẦN, đồng bộ, không ném lỗi, KHÔNG giải nén dữ liệu node. bytes = toàn bộ file, hoặc ≥ bytesNeeded byte đầu khi bảng info ở đầu file
+UnityFS.bytesNeeded(header, fileSize) -> số byte đầu cần để đọc bảng info
+UnityFS.readNode(bytes /*TOÀN BỘ file*/, bundle, nodeIndex, {isCancelled?}) -> Promise<Uint8Array>   // chỉ giải nén các block phủ node; ném FsError{code: NOT_PARSED|NO_NODE|TOO_LARGE|NODE_RANGE|TRUNCATED|CANCELLED|SIZE|UNSUPPORTED_COMPRESSION|LZ4_BAD|LZMA_BAD}
+UnityFS.decompress(method, src, dstSize) / lz4Block(src,dstSize) / lzma(src,dstSize)   // method 0 none, 1 LZMA (raw: 5 byte props+dict), 2 LZ4, 3 LZ4HC; 4 LZHAM → ném UNSUPPORTED_COMPRESSION
+UnityFS.selectCandidates(entries, manifest|null, rootPath) -> {candidates:[{entry,rel,selected_by:'ext'|'magic'|'ext+magic'}], manifest_used}   // THUẦN
+UnityFS.scan(file, ipaResult, entries, {isCancelled?, progress?(0..1)}) -> Promise<UnityFsResult>   // chỉ ném CANCELLED; entries = ENTRY GỐC của openZip
+UnityFS.toIndex(res) -> object (= Meta/unityfs_index.json), UnityFS.toReportFields(res) -> {unityfs_status, unityfs_bundles, unityfs_bundles_parsed, unityfs_nodes, unityfs_unity_revisions}|null
+UnityFS.LIMITS = {max_bundle_bytes:256MiB, max_info_bytes:64MiB, max_blocks:200000, max_nodes:100000, max_node_bytes:256MiB, max_bundles:500, max_listed_nodes:2000, head_bytes:4096} (đối tượng dùng chung; test chỉnh được), SCHEMA='unityfs_index/1', NOT_DONE[4]
+```
+```
+Bundle (kết quả open) = { schema:'unityfs_bundle/1', status:'parsed'|'not_unityfs'|'unsupported_format'|'unsupported_version'|'unsupported_compression'|'decompress_failed'|'invalid'|'truncated'|'too_large'|'need_more_bytes',
+  reason, header, compression:{code,name}|null, blocks[], nodes[], data_start, data_start_exact:true|false|null, total_uncompressed, info_offset, info_hash, problems[], notes[], need? }
+UnityFsResult (= results.unityfs) = { schema:'unityfs_index/1', sub_phase:'5.2a', status:'ok'|'partial'|'none_parsed'|'no_bundles'|'error'|'not_run', reason,
+  items:[{id, path, zip_path, size, selected_by, status(như Bundle.status | 'read_error'), reason, signature, format_version, min_player_version, unity_revision, flags_hex, compression:{code,name}|null,
+          block_count, node_count, total_uncompressed, data_start_exact, block_compression:{LZ4:n,…}, nodes:[{index,path,offset,size,flags,is_serialized,unsafe_path}] (≤2000), nodes_truncated, problems[], notes[]}],
+  summary:{bundles, parsed, nodes, serialized_nodes, total_uncompressed, by_status{}, by_compression{}, unity_revisions[]}|null, limits, limitations[4], warnings[], source:{manifest_used} }
+```
+**Ngữ nghĩa/quyết định:** `parsed` = đọc được header + bảng info + liệt kê node; KHÔNG có nghĩa đã đọc nội dung node hay SerializedFile. `is_serialized` chỉ là cờ node (flags & 4), chưa kiểm nội dung. Bảng info nén LZ4/LZ4HC/LZMA/không nén; LZHAM, version ngoài 6..8, UnityWeb/UnityRaw/UnityArchive → trạng thái unsupported (giữ nguyên, không đoán). Giải nén lỗi → `decompress_failed` (ghi rõ: file hỏng/biến thể không hỗ trợ/mã hóa riêng; KHÔNG thử giải mã). Đường dẫn node không an toàn (`..`, tuyệt đối, NUL) chỉ gắn cờ `unsafe_path` – không dùng làm tên file.
+**Vị trí dữ liệu (rủi ro #1 chưa kiểm trên bundle thật):** bảng info ở đầu: sau header (căn 16 nếu version ≥ 7); info ở cuối (flag 0x80): tại `fileSize − compressed_info_size`. Điểm bắt đầu vùng dữ liệu là ứng viên (có/không căn 16, ưu tiên căn 16 khi flag 0x200) được CHỌN BẰNG TỰ KIỂM: ứng viên nào làm `start + Σ csize(block)` khớp CHÍNH XÁC cuối vùng (fileSize hoặc đầu bảng info) thì chọn (`data_start_exact=true`); không khớp nào → `invalid`. Bố cục header/info lấy từ kiến thức về AssetStudio/UnityPy (không tải được nguồn trong phiên, mạng tắt).
+**LZMA:** bộ giải tự viết (range coder + literal/match/rep), kích thước đích biết trước, dùng chính vùng đích làm từ điển (chặn khoảng cách vượt dữ liệu đã giải). **LZ4:** block format; offset 0/vượt/thiếu/thừa byte → lỗi.
+
+## Thay đổi ở module cũ (Account 06, 5.2a)
+- `IpaReader.analyze`: bước 10 `unityfs` (sau `fonts`): `IpaResult.unityfs: UnityFsResult|null`; `skipped` khi `no_bundles`; lỗi chỉ thành cảnh báo; hủy → CANCELLED. `State.PIPELINE_STEPS`: thêm `{id:'unityfs', label:'AssetBundle UnityFS (container)'}` sau `fonts`.
+- `Events.applyResult`: `session.results.unityfs`; nút `#btn-unityfs-json` (trong view Unity/Metadata) tải `unityfs_index.json`.
+- UI: `buildUnityFsCard` trong view `metadata` (hiện cả khi Phase 4.1 không kết luận Unity): tóm tắt, bảng bundle, bảng node (tìm kiếm/phân trang), vấn đề/ghi chú, “Chưa làm”. `renderUnity` cache theo cả `results.unity` và `results.unityfs`. `NS.VERSION='0.10.0-phase5.2a'`.
+- Worker importScripts thêm `../modules/unity_fs.js`; `index.html` nạp `js/modules/unity_fs.js` sau `font_dump.js`.
+- `FontDump` KHÔNG đổi: vẫn chỉ liệt kê `unity_containers` là “chưa parse”; font bên trong bundle CHƯA được trích xuất.
+
+## Chưa tồn tại (đừng gọi)
+SerializedFile reader (danh sách object, ClassID, TextAsset/Font/TMP_FontAsset/Texture2D), xuất node ra `Raw/`/ZIP (Phase 9), metadata font (5.2b), độ phủ tiếng Việt (5.3).

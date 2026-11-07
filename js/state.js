@@ -14,6 +14,7 @@
     { id: 'tables',   label: 'Metadata IL2CPP (assembly/class/method/field)' },
     { id: 'extract',  label: 'Trích xuất dữ liệu' },
     { id: 'fonts',    label: 'Font (phát hiện, trích xuất)' },
+    { id: 'unityfs',  label: 'AssetBundle UnityFS (container)' },
     { id: 'report',   label: 'Tạo báo cáo' },
     { id: 'package',  label: 'Đóng gói ZIP' }
   ];

@@ -515,6 +515,25 @@
       warn('Phát hiện font thất bại: ' + ((e && e.message) || e));
       step('fonts', 'error', (e && e.message) || 'Lỗi');
     }
+    progress(0.9995);
+
+    /* --- Bước 10: AssetBundle UnityFS (Phase 5, sub-phase 5.2a): chỉ đọc container (header, block, node). KHÔNG giải nén/parse nội dung node. Lỗi chỉ thành cảnh báo. --- */
+    step('unityfs', 'running', 'Đọc container AssetBundle (UnityFS)');
+    try {
+      if (!NS.UnityFS) throw new IpaError('NO_UNITYFS_MODULE', 'Thiếu module unity_fs.js');
+      const ur = await NS.UnityFS.scan(file, result, entries, { isCancelled: cancelled });
+      result.unityfs = ur; const us = ur.summary || {};
+      if (ur.status === 'no_bundles') { log('INFO', 'UnityFS: ' + ur.reason); step('unityfs', 'skipped', 'Không có AssetBundle'); }
+      else {
+        log(ur.status === 'ok' ? 'SUCCESS' : 'WARNING', 'UnityFS: ' + ur.status + ' – ' + ur.reason, us);
+        ur.warnings.forEach(function (w) { warn(w); });
+        step('unityfs', ur.status === 'error' ? 'error' : 'done', (us.parsed || 0) + '/' + (us.bundles || 0) + ' bundle, ' + (us.nodes || 0) + ' node');
+      }
+    } catch (e) {
+      if (e && e.code === 'CANCELLED') throw e;
+      warn('Đọc UnityFS thất bại: ' + ((e && e.message) || e));
+      step('unityfs', 'error', (e && e.message) || 'Lỗi');
+    }
     progress(1);
     return result;
   }

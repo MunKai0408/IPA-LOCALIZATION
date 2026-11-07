@@ -156,7 +156,7 @@
           <p>Chưa có kết quả. Tải IPA ở mục “Phân tích IPA” rồi bấm Bắt đầu phân tích. Các bước này dò thành phần Unity, chọn file global-metadata.dat và kiểm tra header/phiên bản trích xuất string literal và assembly/class/method/field (khi version có bố cục xác minh).</p>
         </div>
         <div id="unity-detail" hidden>
-          <div class="toolbar"><span class="spacer"></span><button class="btn btn-sm" id="btn-dumpcs" type="button">Tải dump.cs</button> <button class="btn btn-sm" id="btn-metatables-json" type="button">Tải metadata_tables.json</button> <button class="btn btn-sm" id="btn-literals-json" type="button">Tải unity_string_literals.json</button> <button class="btn btn-sm" id="btn-metaheader-json" type="button">Tải metadata_summary.json (header)</button> <button class="btn btn-sm" id="btn-unity-json" type="button">Tải unity_info.json</button></div>
+          <div class="toolbar"><span class="spacer"></span><button class="btn btn-sm" id="btn-dumpcs" type="button">Tải dump.cs</button> <button class="btn btn-sm" id="btn-metatables-json" type="button">Tải metadata_tables.json</button> <button class="btn btn-sm" id="btn-literals-json" type="button">Tải unity_string_literals.json</button> <button class="btn btn-sm" id="btn-metaheader-json" type="button">Tải metadata_summary.json (header)</button> <button class="btn btn-sm" id="btn-unity-json" type="button">Tải unity_info.json</button> <button class="btn btn-sm" id="btn-unityfs-json" type="button">Tải unityfs_index.json</button></div>
           <div id="unity-body"></div>
         </div>
       </section>
@@ -207,6 +207,7 @@
 <script src="js/modules/metadata_dump.js"></script>
 <script src="js/modules/metadata_tables.js"></script>
 <script src="js/modules/font_dump.js"></script>
+<script src="js/modules/unity_fs.js"></script>
 <script src="js/ipa_reader.js"></script>
 <script src="js/worker_manager.js"></script>
 <script src="js/state.js"></script>

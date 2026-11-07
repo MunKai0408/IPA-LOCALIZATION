@@ -580,15 +580,41 @@
     box.appendChild(listBlock('Chưa làm ở sub-phase 5.1 (có chủ đích)', f.limitations));
   }
   NS.UI_saveBlob = saveBlob;
-  let lastUnity = null;
+  let lastUnity = null, lastUnityFs = null;
+
+  /* Thẻ AssetBundle UnityFS (sub-phase 5.2a): CHỈ container (header/block/node); nội dung node chưa parse. */
+  const UFS_STATUS = { parsed: 'Đọc được container', not_unityfs: 'Không phải UnityFS', unsupported_format: 'Định dạng cũ (chưa hỗ trợ)', unsupported_version: 'Phiên bản UnityFS lạ', unsupported_compression: 'Kiểu nén chưa hỗ trợ',
+    decompress_failed: 'Giải nén bảng info lỗi', invalid: 'Cấu trúc không hợp lệ', truncated: 'Bị cắt cụt', too_large: 'Quá lớn để đọc', read_error: 'Lỗi đọc entry' };
+  function buildUnityFsCard(uf) {
+    if (!uf || uf.status === 'not_run') return null;
+    const card = h('div', { class: 'card mt-3' }, [h('h2', { class: 'section-title', text: 'AssetBundle UnityFS (sub-phase 5.2a)' })]);
+    if (uf.status === 'no_bundles' || !uf.summary) { card.appendChild(h('p', { class: 'dim', text: uf.reason || 'Không có AssetBundle.' })); return card; }
+    const s = uf.summary, kv = h('dl', { class: 'kv' });
+    kvRow(kv, 'Kết quả', uf.reason);
+    kvRow(kv, 'Bundle / đọc được', s.bundles + ' / ' + s.parsed + ' · ' + s.nodes + ' node (' + s.serialized_nodes + ' đánh dấu SerializedFile) · ' + formatBytes(s.total_uncompressed) + ' sau giải nén');
+    kvRow(kv, 'Kiểu nén bảng info', Object.keys(s.by_compression).map(function (k) { return k + ' ×' + s.by_compression[k]; }).join(', ') || '—');
+    kvRow(kv, 'Phiên bản Unity (từ header bundle)', s.unity_revisions.join(', ') || 'Không đọc được');
+    card.appendChild(kv);
+    card.appendChild(h('p', { class: 'dim mt-2', text: 'Chỉ mới đọc container (header, block, node). Nội dung node chưa được giải nén/parse nên CHƯA biết bên trong có TextAsset, Font hay TMP hay không.' }));
+    card.appendChild(buildPagedTable(['Bundle', 'Trạng thái', 'Revision', 'Nén', 'Block', 'Node', 'Kích thước'], uf.items, function (it) {
+      return [it.path, (UFS_STATUS[it.status] || it.status) + (it.status !== 'parsed' && it.reason ? ' – ' + it.reason : ''), it.unity_revision || '', it.compression ? it.compression.name : '', it.block_count === null ? '' : String(it.block_count), it.node_count === null ? '' : String(it.node_count), formatBytes(it.size)];
+    }, function (it) { return it.path + ' ' + it.status; }, 'Tìm bundle'));
+    const nodes = []; uf.items.forEach(function (it) { it.nodes.forEach(function (n) { nodes.push({ b: it.path, n: n }); }); });
+    if (nodes.length) card.appendChild(buildPagedTable(['Bundle', 'Node', 'Offset', 'Kích thước', 'Serialized'], nodes, function (x) { return [x.b, x.n.path + (x.n.unsafe_path ? ' ⚠ ' + x.n.unsafe_path : ''), String(x.n.offset), formatBytes(x.n.size), x.n.is_serialized ? 'có (cờ)' : ''] }, function (x) { return x.b + ' ' + x.n.path; }, 'Tìm node'));
+    const probs = []; uf.items.forEach(function (it) { it.problems.concat(it.notes).forEach(function (p) { probs.push(it.path + ': ' + p); }); });
+    if (probs.length) card.appendChild(listBlock('Vấn đề/ghi chú trong bundle', probs, 30));
+    if (uf.warnings.length) card.appendChild(listBlock('Cảnh báo', uf.warnings));
+    card.appendChild(listBlock('Chưa làm', uf.limitations));
+    return card;
+  }
   function renderUnity(s) {
-    const u = (s.results && s.results.unity) || null;
-    if (u === lastUnity) return;
-    lastUnity = u;
+    const u = (s.results && s.results.unity) || null, uf = (s.results && s.results.unityfs) || null;
+    if (u === lastUnity && uf === lastUnityFs) return;
+    lastUnity = u; lastUnityFs = uf;
     const box = $('#unity-body'), wrap = $('#unity-detail'), empty = $('#unity-empty');
     if (!box || !wrap || !empty) return;
-    box.replaceChildren(); wrap.hidden = !u; empty.hidden = !!u;
-    if (!u) return;
+    box.replaceChildren(); wrap.hidden = !u && !uf; empty.hidden = !!(u || uf);
+    if (!u) { const only = buildUnityFsCard(uf); if (only) box.appendChild(only); return; }   // AssetBundle có thể tồn tại dù Phase 4.1 không kết luận Unity
 
     const st = UNITY_STATUS[u.status] || ['', ''];
     const info = h('dl', { class: 'kv' });
@@ -635,6 +661,7 @@
     box.appendChild(buildMetaHeaderCard(u.metadata_header));
     box.appendChild(buildLiteralsCard(u.metadata_literals));
     box.appendChild(buildTablesCard(u.metadata_tables));
+    const ufCard = buildUnityFsCard(uf); if (ufCard) box.appendChild(ufCard);
 
     if (u.warnings.length || u.notes.length) {
       box.appendChild(h('div', { class: 'card mt-3' }, [

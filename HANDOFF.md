@@ -1,6 +1,28 @@
 # HANDOFF.md
 
-## Phiên hiện tại: Account 05 (làm tiếp theo yêu cầu người dùng) – SUB-PHASE 5.1 HOÀN THÀNH (trên dữ liệu giả lập) → bàn giao cho Account 06 làm 5.2
+## Phiên hiện tại: Account 06 (theo yêu cầu người dùng “viết thêm parser UnityFS”) – SUB-PHASE 5.2a HOÀN THÀNH (trên dữ liệu giả lập) → bàn giao Account 07 làm 5.2b
+Vòng quay: 01 → … → 10 → 01. Account 05 đã bàn giao 5.1; NEXT_TASK cũ là “5.2 font metadata + TMP (UnityFS chỉ làm nếu parser đọc được an toàn)”. Người dùng yêu cầu parser UnityFS nên Account 06 làm đúng phần UnityFS (5.2a) và CHƯA làm metadata font (chuyển thành 5.2b).
+
+### 5.2a – UNITYFS CONTAINER PARSER
+Tạo: `js/modules/unity_fs.js`, `tests/make_unityfs_ipas.py`, `tests/run_unityfs_tests.js`.
+Sửa: `js/ipa_reader.js` (bước 10 `unityfs`), `js/state.js` (bước pipeline), `js/workers/ipa.worker.js` + `index.html` (nạp module, nút `#btn-unityfs-json`), `js/events.js` (`results.unityfs`, nút tải), `js/ui.js` (`buildUnityFsCard`, `renderUnity` cache theo cả unityfs, hiện thẻ cả khi `results.unity` rỗng), `js/app.js` (0.10.0-phase5.2a), INTERFACES/NEXT_TASK/HANDOFF/README.
+**Làm được:** header UnityFS (v6–8), bảng blocks+directory (LZ4/LZ4HC/LZMA/không nén), liệt kê block/node, giải nén nội dung MỘT node (`readNode`), quét mọi bundle trong IPA (chọn bằng đuôi hoặc magic qua manifest), JSON `unityfs_index.json`, UI. **Chưa làm (cố ý):** SerializedFile/object (TextAsset, Font, TMP…), LZHAM, UnityWeb/Raw/Archive, xuất node ra file/ZIP.
+**Kiểm thử đã chạy (TẤT CẢ DỮ LIỆU GIẢ LẬP):** `node tests/run_unityfs_tests.js` **217 đạt**: 12 bundle hợp lệ (LZ4, LZ4HC, LZMA, không nén, info ở cuối v6/v7, cờ 0x200, block hỗn hợp 4 kiểu nén, LZMA lc/lp/pb khác mặc định, 2,5 MB với match xa, node rỗng, tên node Unicode) – từng node giải nén khớp SHA-256 tính độc lập bằng hashlib; 17 ca lỗi (cắt cụt, header cụt, info LZHAM, version 9, UnityWeb, magic sai, info 2 GB, info LZ4/LZMA bị phá, bit flag lạ, size header sai, node vượt dữ liệu, đường dẫn node `..`/tuyệt đối, block LZHAM, rỗng, chỉ chữ ký); `readNode` (node không tồn tại, bundle chưa parse, hủy, thiếu byte, sửa byte → SHA khác); `scan` trong IPA (29 ứng viên, 18 đọc được, file không đuôi chọn bằng magic, hủy, giới hạn số bundle/dung lượng, không manifest, không có bundle). Mutation: 8 phá hoại (LZ4 chồng lấn, LZMA matched-literal, LZMA rep3, bỏ căn lề v7, bỏ ứng viên căn lề, bỏ kiểm node vượt, bỏ kiểm version, giải nén block thừa) → test đều fail. Hồi quy: detect 359, scan 112, unity 86, metadata 72, literal 53, tables 314, font 76 – đạt. Chromium headless (390 px và 1100 px, worker thật): bước `unityfs` “18/29 bundle, 35 node”, thẻ hiển thị, tải `unityfs_index.json` đúng schema, 0 lỗi JS, 0 request ngoài, không tràn ngang.
+**CHƯA kiểm thử – quan trọng:** bundle UnityFS THẬT (chưa từng có). Fixture do chính Account 06 dựng theo CÙNG giả định bố cục với module → chỉ chứng minh logic nhất quán, KHÔNG chứng minh khớp định dạng Unity thật. Mạng tắt nên không đối chiếu được AssetStudio/UnityPy; bố cục viết từ kiến thức. Điểm rủi ro nhất: vị trí bắt đầu vùng dữ liệu (căn lề 16 ở v7/flag 0x200) – đã có tự kiểm bằng tổng kích thước block, nếu sai sẽ báo `invalid` chứ không đọc bậy. Cũng chưa kiểm: LZMA trên bundle Unity thật (dùng props+dict 5 byte), bộ nhớ với bundle gần 256 MiB trên iPhone, Safari thật, hiệu năng LZMA JS (chưa đo trên thiết bị).
+**Đừng hiểu nhầm về DATA WING:** log thật cho thấy 55 “file Unity asset/bundle chưa parse”. Chưa biết chúng là UnityFS hay SerializedFile (`*.assets`, `level*`, `sharedassets*`, `*.resS`). Rất có thể phần lớn KHÔNG phải UnityFS → parser này chưa chắc giúp được. Cần `unity_info.json`/manifest hoặc ảnh view Unity/Metadata sau khi chạy bản 0.10.0 để biết bao nhiêu file có magic UnityFS (thẻ UnityFS sẽ hiện số bundle).
+
+### Quyết định
+- `readNode` chỉ giải nén block phủ node; không giữ bundle trong state (scan chỉ đọc header+info; bundle có info ở cuối phải đọc cả file, tối đa 256 MiB, vượt → `too_large`).
+- Không thử giải mã bundle lỗi/mã hóa; chỉ báo trạng thái.
+- Thẻ UnityFS nằm trong view “Unity / Metadata”, không tạo view mới.
+
+### Hạn chế còn tồn tại
+- Git/GitHub: không có `.git` trong zip và không có GitHub liên kết → KHÔNG commit/push được trong phiên này; người dùng cần tự đưa zip lên repo.
+- Như 5.1 (font thật, Safari iPhone, bộ nhớ).
+
+---
+
+## (Trước đó) Account 05 (làm tiếp theo yêu cầu người dùng) – SUB-PHASE 5.1 HOÀN THÀNH (trên dữ liệu giả lập) → bàn giao cho Account 06 làm 5.2
 Phase 4 đã xác nhận trên IPA thật (xem mục “XÁC NHẬN TRÊN FILE THẬT” bên dưới). Người dùng yêu cầu “làm tiếp 5.1” nên 5.1 được làm trong cùng phiên.
 
 ### 5.1 – FONT DISCOVERY AND EXTRACTION
