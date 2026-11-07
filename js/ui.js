@@ -447,7 +447,7 @@
     too_large: ['Quá lớn cho trình duyệt', 'danger'], read_error: ['Không đọc được', 'danger'], not_eligible: ['Không đủ điều kiện', ''] };
   function buildLiteralsCard(l) {
     const card = h('div', { class: 'card mt-3' }, [h('h2', { class: 'section-title', text: 'String literal (sub-phase 4.3)' })]);
-    if (!l) { card.appendChild(h('p', { class: 'dim', text: 'Chưa trích xuất: chỉ chạy khi header metadata đạt kiểm tra chung (xem thẻ trên). Assembly, namespace, class, method, field và dump.cs CHƯA được hỗ trợ vì bố cục struct chưa được xác minh từ nguồn đáng tin.' })); return card; }
+    if (!l) { card.appendChild(h('p', { class: 'dim', text: 'Chưa trích xuất: chỉ chạy khi header metadata đạt kiểm tra chung (xem thẻ trên).' })); return card; }
     const ls = LIT_STATUS[l.status] || [l.status, ''];
     const kv = h('dl', { class: 'kv' });
     kv.appendChild(h('dt', { text: 'Trạng thái' })); kv.appendChild(h('dd', {}, [h('span', { class: 'badge ' + ls[1], text: ls[0] })]));
@@ -480,7 +480,63 @@
       card.appendChild(h('div', { class: 'table-wrap' }, [table]));
       draw();
     }
-    card.appendChild(h('p', { class: 'dim mt-2', text: 'Chưa hỗ trợ: assembly, namespace, class, method, field và dump.cs (bố cục struct chưa xác minh). Chuỗi trùng không bị gộp; chỉ hiển thị tối đa 300 ký tự mỗi dòng (JSON tải về đầy đủ).' }));
+    card.appendChild(h('p', { class: 'dim mt-2', text: 'Chuỗi trùng không bị gộp; chỉ hiển thị tối đa 300 ký tự mỗi dòng (JSON tải về đầy đủ).' }));
+    return card;
+  }
+  const TBL_STATUS = { ok: ['Đã trích xuất', 'success'], unsupported_version: ['Version chưa có bố cục xác minh', 'warning'], layout_mismatch: ['Bố cục không khớp', 'danger'], invalid_table: ['Bảng không hợp lệ', 'danger'],
+    too_large: ['Quá lớn cho trình duyệt', 'danger'], read_error: ['Không đọc được', 'danger'], not_eligible: ['Không đủ điều kiện', ''] };
+  /** Bảng có tìm kiếm + phân trang (chỉ dựng DOM cho một trang). cols: tiêu đề; rowsOf(): mảng dữ liệu; cells(x): mảng chuỗi; hay(x): chuỗi để tìm. */
+  function buildPagedTable(cols, rows, cells, hay, label) {
+    const PAGE = 100; let page = 0, query = '';
+    const input = h('input', { type: 'search', class: 'input', placeholder: 'Tìm…', 'aria-label': label });
+    const info = h('span', { class: 'dim' }), prev = h('button', { class: 'btn btn-sm', type: 'button', text: '‹' }), next = h('button', { class: 'btn btn-sm', type: 'button', text: '›' });
+    const tbody = h('tbody'), table = h('table', { class: 'tbl' }, [h('thead', {}, [h('tr', {}, cols.map(function (x) { return h('th', { text: x }); }))]), tbody]);
+    const draw = function () {
+      const q = query.toLowerCase();
+      const list = q ? rows.filter(function (x) { return hay(x).toLowerCase().indexOf(q) >= 0; }) : rows;
+      const pages = Math.max(1, Math.ceil(list.length / PAGE)); if (page >= pages) page = pages - 1;
+      tbody.replaceChildren();
+      list.slice(page * PAGE, page * PAGE + PAGE).forEach(function (x) { tbody.appendChild(h('tr', {}, cells(x).map(function (c) { return h('td', { class: 'path', text: c }); }))); });
+      info.textContent = list.length + ' / ' + rows.length + ' · trang ' + (page + 1) + '/' + pages;
+      prev.disabled = page === 0; next.disabled = page >= pages - 1;
+    };
+    input.addEventListener('input', function () { query = input.value; page = 0; draw(); });
+    prev.addEventListener('click', function () { page--; draw(); }); next.addEventListener('click', function () { page++; draw(); });
+    draw();
+    return h('div', {}, [h('div', { class: 'toolbar mt-2' }, [input, prev, next, info]), h('div', { class: 'table-wrap' }, [table])]);
+  }
+  function buildTablesCard(t) {
+    const card = h('div', { class: 'card mt-3' }, [h('h2', { class: 'section-title', text: 'Assembly / namespace / class / method / field (sub-phase 4.3)' })]);
+    if (!t) { card.appendChild(h('p', { class: 'dim', text: 'Chưa trích xuất: chỉ chạy khi header metadata đạt kiểm tra chung (xem thẻ Header) và version có bố cục xác minh.' })); return card; }
+    const ts = TBL_STATUS[t.status] || [t.status, ''];
+    const kv = h('dl', { class: 'kv' });
+    kv.appendChild(h('dt', { text: 'Trạng thái' })); kv.appendChild(h('dd', {}, [h('span', { class: 'badge ' + ts[1], text: ts[0] })]));
+    kvRow(kv, 'Lý do', t.reason);
+    if (t.status === 'ok') {
+      kvRow(kv, 'Bố cục', 'version ' + t.version + (t.layout && t.layout.detected !== t.version ? ' (nhận diện ' + t.layout.detected + ')' : '') + ' · kích thước struct: ' + Object.keys(t.struct_sizes).map(function (k) { return k + ' ' + t.struct_sizes[k] + ' B'; }).join(', '));
+      kvRow(kv, 'Số lượng', t.counts.assemblies + ' assembly · ' + t.counts.images + ' image · ' + t.counts.namespaces + ' namespace · ' + t.counts.types + ' type · ' + t.counts.methods + ' method · ' + t.counts.fields + ' field');
+      const pc = Object.keys(t.problem_counts).reduce(function (a, k) { return a + t.problem_counts[k]; }, 0);
+      kvRow(kv, 'Bất thường', pc + ' (cấu trúc) · ' + t.name_problems.name_out_of_range + ' tên ngoài vùng · ' + t.name_problems.unterminated + ' tên không kết thúc · ' + t.name_problems.invalid_utf8 + ' UTF-8 sai');
+    }
+    card.appendChild(kv);
+    if (t.status === 'ok') {
+      const holder = h('div'), sel = h('select', { class: 'input', 'aria-label': 'Chọn bảng' });
+      const views = {
+        'Assembly': function () { return buildPagedTable(['#', 'Tên', 'Phiên bản', 'Image', 'Token'], t.assemblies, function (a) { return [String(a.index), a.name === null ? '(không đọc được)' : a.name, a.version, String(a.image_index), a.token === null ? '' : '0x' + a.token.toString(16).toUpperCase()]; }, function (a) { return a.name || ''; }, 'Tìm assembly'); },
+        'Image': function () { return buildPagedTable(['#', 'Tên', 'Type bắt đầu', 'Số type'], t.images, function (a) { return [String(a.index), a.name === null ? '(không đọc được)' : a.name, String(a.type_start), String(a.type_count)]; }, function (a) { return a.name || ''; }, 'Tìm image'); },
+        'Type / class': function () { return buildPagedTable(['#', 'Namespace', 'Tên', 'Loại', 'Hiển thị', 'Field', 'Method'], t.types, function (a) { return [String(a.index), a.namespace || '', a.name === null ? '(không đọc được)' : a.name, a.kind, a.visibility, String(a.field_count), String(a.method_count)]; }, function (a) { return (a.full_name || '') + ' ' + a.kind; }, 'Tìm type'); },
+        'Method': function () { return buildPagedTable(['#', 'Type', 'Tên', 'Truy cập', 'Tham số', 'Token'], t.methods, function (a) { return [String(a.index), a.type_index >= 0 && t.types[a.type_index] ? t.types[a.type_index].full_name : '(không rõ)', a.name === null ? '(không đọc được)' : a.name, a.access + (a.is_static ? ' static' : ''), a.parameters.map(function (p) { return p.name; }).join(', '), '0x' + a.token.toString(16).toUpperCase()]; }, function (a) { return (a.name || '') + ' ' + (a.type_index >= 0 && t.types[a.type_index] ? t.types[a.type_index].full_name : ''); }, 'Tìm method'); },
+        'Field': function () { return buildPagedTable(['#', 'Type', 'Tên', 'Chỉ số kiểu (thô)'], t.fields, function (a) { return [String(a.index), a.type_index >= 0 && t.types[a.type_index] ? t.types[a.type_index].full_name : '(không rõ)', a.name === null ? '(không đọc được)' : a.name, 'type#' + a.type_raw_index]; }, function (a) { return (a.name || '') + ' ' + (a.type_index >= 0 && t.types[a.type_index] ? t.types[a.type_index].full_name : ''); }, 'Tìm field'); }
+      };
+      Object.keys(views).forEach(function (k) { sel.appendChild(h('option', { value: k, text: k })); });
+      const show = function () { holder.replaceChildren(views[sel.value]()); };
+      sel.addEventListener('change', show);
+      card.appendChild(h('div', { class: 'toolbar mt-2' }, [h('label', { class: 'dim', text: 'Xem: ' }), sel]));
+      card.appendChild(holder); sel.value = 'Type / class'; show();
+      if (t.problems.length) card.appendChild(listBlock('Bất thường cấu trúc (tối đa 200 dòng đầu)', t.problems.map(function (p) { return '[' + p.code + '] ' + p.message; }), 40));
+    }
+    card.appendChild(listBlock('Không có trong kết quả (có chủ đích)', t.not_extracted));
+    card.appendChild(h('p', { class: 'dim mt-2', text: 'Bố cục lấy từ mã nguồn Il2CppDumper (xem metadata_tables.js). Dữ liệu trên là từ metadata, chưa đối chiếu với metadata của game thật. Tên kiểu của field/tham số là chỉ số thô vào bảng kiểu của binary, không được suy ra.' }));
     return card;
   }
   let lastUnity = null;
@@ -537,6 +593,7 @@
     box.appendChild(mc);
     box.appendChild(buildMetaHeaderCard(u.metadata_header));
     box.appendChild(buildLiteralsCard(u.metadata_literals));
+    box.appendChild(buildTablesCard(u.metadata_tables));
 
     if (u.warnings.length || u.notes.length) {
       box.appendChild(h('div', { class: 'card mt-3' }, [

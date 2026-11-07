@@ -298,8 +298,8 @@ HeaderResult (= results.unity.metadata_header) = {
 ```
 MetadataDump.extractLiterals(file, unityInfo, entries, {isCancelled?, progress?(0..1)}) -> Promise<LiteralResult>   // chỉ ném CANCELLED; dùng IpaReader.streamEntry (luồng, không nạp cả file; chỉ giữ 2 vùng bảng+dữ liệu)
 MetadataDump.decodeLiterals(table:Uint8Array, data:Uint8Array) -> {literals, empty, invalid_utf8, out_of_range, distinct, total_text_bytes}   // THUẦN
-MetadataDump.toReportFields(h, lit?)  // thêm string_literals_status/count/invalid_utf8/out_of_range, metadata_not_supported[5]
-MetadataDump.toSummary(h, lit?) -> { schema:'metadata_summary/2', sub_phase:'4.3', partial:true, header, string_literals:{status,reason,version,count,empty,distinct,invalid_utf8,out_of_range,total_text_bytes,source}|null, not_supported:{assemblies,namespaces,classes,methods,fields:{status:'not_supported',reason}} }
+MetadataDump.toReportFields(h, lit?, tables?)  // string_literals_*; metadata_not_supported[5] khi tables chưa ok, [] khi ok + trường metadata_* của MetadataTables.toReportFields
+MetadataDump.toSummary(h, lit?, tables?) -> { schema:'metadata_summary/3' (Account 05; trước là /2), sub_phase:'4.3', partial:!(tables ok), tables:{status,reason,version,layout,counts,struct_sizes,problem_counts,name_problems,not_extracted,reference_sources,notes}|null, header, string_literals:{status,reason,version,count,empty,distinct,invalid_utf8,out_of_range,total_text_bytes,source}|null, not_supported:{assemblies,namespaces,classes,methods,fields:{status:'not_supported',reason}} }
 MetadataDump.LITERAL_VERSIONS=[16,17,19,20,21,22,24,27,29,31], LITERAL_SCHEMA='unity_string_literals/1', NOT_SUPPORTED[5]
 ```
 ```
@@ -312,10 +312,57 @@ LiteralResult (= results.unity.metadata_literals = Text/unity_string_literals.js
 }
 ```
 **Cơ sở (đã đối chiếu 2 nguồn công khai):** bảng literal = cặp header #0 (offset, size BYTE), mỗi phần tử 8 B `{u32 length, u32 dataIndex}`; dữ liệu = cặp #1, chuỗi = UTF-8 tại `dataOffset + dataIndex`, `length` byte (Il2CppDumper `Metadata.cs`; il2cpp_dumper `structures.rs` – tóm tắt: length chỉ có trước v35). Chỉ hỗ trợ version có trong CẢ HAI nguồn (LITERAL_VERSIONS). v33/35/38+… → `unsupported_version`. Nếu >50% literal (≥8 mục) trỏ ngoài vùng dữ liệu → `invalid_table`, không xuất literal (bố cục thực tế có thể khác hoặc dữ liệu bị mã hóa).
-**CHƯA hỗ trợ (cố ý):** assembly/namespace/class/method/field và `Meta/dump.cs` – bố cục struct theo version chưa có byte-layout xác minh (chỉ có tóm tắt diễn giải). Cần đọc đầy đủ `MetadataClasses.cs`/`structures.rs`.
+**(Account 05)** assembly/image/class/method/field + `dump.cs` đã được làm ở module riêng `NS.MetadataTables` (mục bên dưới).
 
 ## Thay đổi ở module cũ
 - `UnityInfo`: `schema:'unity_info/3'`, `sub_phase:'4.3'`, thêm `metadata_literals: LiteralResult|null`.
 - `State.PIPELINE_STEPS`: thêm `{id:'literals', label:'Metadata IL2CPP (string literal)'}` sau `metadata`.
 - `IpaReader.analyze`: bước 7 `literals` (skipped nếu header ≠ generic_ok hoặc version chưa hỗ trợ; done khi ok; error khi lỗi). Lỗi chỉ thành warning.
 - UI: `buildLiteralsCard` (tìm kiếm, phân trang 100 dòng); nút `#btn-literals-json` tải `unity_string_literals.json`; `#btn-metaheader-json` giờ truyền cả literal vào `toSummary`. `NS.VERSION='0.7.0-phase4.3'`.
+
+
+---
+# Bổ sung Phase 4 – SUB-PHASE 4.3 (phần còn lại): Assembly / Image / Type / Method / Field + dump.cs (Account 05)
+
+## NS.MetadataTables (js/modules/metadata_tables.js) – Worker + luồng chính. Nạp SAU metadata_dump.js, TRƯỚC ipa_reader.js (index.html + worker importScripts đã cập nhật)
+```
+MetadataTables.extractTables(file, unityInfo, entries, {isCancelled?, progress?(0..1)}) -> Promise<TablesResult>   // chỉ ném CANCELLED. Đọc 4096 B đầu (header) rồi 1 lượt streamEntry, chỉ giữ 8 vùng cần thiết
+MetadataTables.parseHeader(bytes:Uint8Array) -> {ok, error?, version, layout_version, header:{tên trường C#: số}, header_size}   // THUẦN; v24: 272 B, hoặc 264 B (24.2) khi stringLiteralOffset==264
+MetadataTables.planRegions(header, headerSize, fileSize) -> {ok, regions:[{key,offset,size}], total_tables, errors[], too_large?}   // THUẦN, kiểm tra vùng trong file/không đè header/giới hạn bộ nhớ
+MetadataTables.decodeTables(hdrInfo, buffers:{strings,images,assemblies,typedefs,methods,parameters,fields,nested}) -> TablesResult   // THUẦN, không ném lỗi
+MetadataTables.layoutOf(structName, V) -> {size, fields:[{name,kind,off}]}   // structName ∈ header|aname|assembly|image|typedef|method|parameter|field; V có thể 24.1/24.2/24.4
+MetadataTables.toDumpCs(tablesResult) -> string|null   // null nếu status != 'ok'
+MetadataTables.toReportFields(tablesResult) -> {metadata_tables_status, metadata_assemblies, metadata_images, metadata_namespaces, metadata_types, metadata_methods, metadata_fields, metadata_table_problems}|null
+MetadataTables.TABLE_VERSIONS=[16,17,19,20,21,22,24,27,29,31], LIMITS, SOURCES, STRUCTS, CS_CLASS, NOT_EXTRACTED, SCHEMA='metadata_tables/1'
+```
+```
+TablesResult (= results.unity.metadata_tables = Meta/metadata_tables.json) = {
+  schema:'metadata_tables/1', sub_phase:'4.3',
+  status:'ok'|'not_eligible'|'unsupported_version'|'layout_mismatch'|'invalid_table'|'too_large'|'read_error', reason, version, path, entry_path,
+  layout:{version_field, detected, assembly_layout}|null,      // v24: detected ∈ 24|24.1|24.2|24.4 (24.2≡24.3, 24.4≡24.5 cùng bố cục)
+  counts:{assemblies,images,types,methods,fields,parameters,namespaces}|null, struct_sizes:{image,assembly,typedef,method,parameter,field}|null,
+  assemblies:[{index,name,culture,image_index,token|null,version:'a.b.c.d',flags,hash_alg,public_key_token(hex),referenced_assembly_start|null,referenced_assembly_count|null}],
+  images:[{index,name,assembly_index,type_start,type_count,entry_point_index,token|null,exported_type_start?,exported_type_count?}],
+  types:[{index,image_index(-1 nếu không thuộc image),namespace,name,full_name('Ns.Outer/Inner'),kind:'class'|'struct'|'enum'|'interface',visibility,is_abstract,is_sealed,flags,token|null,
+          field_start,field_count,method_start,method_count,nested_types_start,nested_type_count,nested_in:number|null,parent_type_raw_index,declaring_type_raw_index}],
+  methods:[{index,type_index(-1 nếu không thuộc type),name,flags,iflags,access,is_static,is_virtual,is_abstract,slot,token,parameter_count,parameter_start,return_type_raw_index,parameters:[{name,type_raw_index}]}],
+  fields:[{index,type_index,name,token|null,type_raw_index}],
+  problems:[{code,message}] (≤200), problem_counts:{code:n}, name_problems:{name_out_of_range,invalid_utf8,unterminated},
+  limits:{max_strings_bytes:128MiB,max_tables_bytes:192MiB,max_rows:1.5M,max_name_scan:65536}, not_extracted[9], reference_sources[], notes[]
+}
+```
+**Nguồn bố cục (đọc ĐẦY ĐỦ qua git clone):** Perfare/Il2CppDumper commit `4741d46ba9cd6159c5d853eb9d6fc48b4bfa2b1a` – `MetadataClass.cs`, `Metadata.cs`, `Outputs/Il2CppConstants.cs`, `Outputs/Il2CppDecompiler.cs`. `STRUCTS` trong JS là bản chép tay; `tests/derive_schema_from_cs.py` dẫn xuất lại từ chính file C# → `tests/fixtures/il2cpp_struct_schema.json`; test đối chiếu 15 version × 8 struct.
+**Quy ước:** tên = chuỗi null-terminated UTF-8 tại `stringOffset + nameIndex`; `*_raw_index` là chỉ số vào bảng `Il2CppType` của BINARY (không có trong metadata) → KHÔNG suy tên kiểu. Trường chỉ có từ version nào đó (token…) = `null` khi version thấp hơn (không bịa). Dòng/chỉ số trỏ ngoài bảng → `problems` + `-1`/`null`, không crash; > 50% type bất thường → `invalid_table`, không xuất dữ liệu.
+**Khác tham chiếu có chủ đích:** nhận diện v24.2/24.4 và 24.1/“24.1+” bằng kích thước bảng assembly KHỚP CHÍNH XÁC (68×N / 64×N), không dùng chia nguyên (tham chiếu nhầm 24.1 khi N<16); không khớp → `layout_mismatch`.
+**dump.cs:** chỉ từ metadata: `// Image i: tên - typeStart`, `// Namespace:`, `[visibility] [static|abstract|sealed] class|struct|enum|interface Tên // TypeDefIndex: n`, `/* type#N */ field; // FieldIndex`, method `[access] [static] [abstract|virtual] /* type#ret */ Tên(/* type#N */ tham_số); // MethodIndex, Token, Slot`. Không RVA/offset (không đọc binary), không cờ truy cập field, không attribute.
+
+## Thay đổi ở module cũ (Account 05)
+- `UnityInfo`: thêm `metadata_tables: TablesResult|null` (schema vẫn `unity_info/3`, thêm trường – cộng thêm, không phá).
+- `State.PIPELINE_STEPS`: thêm `{id:'tables', label:'Metadata IL2CPP (assembly/class/method/field)'}` sau `literals`.
+- `IpaReader.analyze`: bước 8 `tables` (skipped nếu header ≠ generic_ok hoặc version chưa hỗ trợ; done khi ok; error khi lỗi; lỗi chỉ thành warning; hủy → CANCELLED).
+- `MetadataDump.toSummary/toReportFields`: thêm tham số `tables?` (xem trên). `toSummary` giờ trả `metadata_summary/3`.
+- UI: `buildTablesCard` + `buildPagedTable` (chọn Assembly/Image/Type/Method/Field, tìm kiếm, phân trang 100 dòng); nút `#btn-dumpcs` (tải dump.cs, sinh khi bấm từ `toDumpCs`) và `#btn-metatables-json` (tải metadata_tables.json). `NS.VERSION='0.8.0-phase4.3'`.
+- Tests: `run_literal_tests.js` và `run_metadata_tests.js` nạp thêm `modules/metadata_tables`; `run_literal_tests.js` đổi 1 dòng schema `/2`→`/3`.
+
+## Chưa tồn tại (đừng gọi)
+- Đóng gói `Meta/dump.cs`, `Meta/metadata_tables.json` vào ZIP (Phase 9). Đọc binary UnityFramework (Il2CppType, RVA, tên kiểu) – chưa có và NGOÀI phạm vi 4.3.

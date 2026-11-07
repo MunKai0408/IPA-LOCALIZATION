@@ -476,6 +476,28 @@
       warn('Trích xuất string literal thất bại: ' + ((e && e.message) || e));
       step('literals', 'error', (e && e.message) || 'Lỗi');
     }
+    progress(0.998);
+
+    /* --- Bước 8: assembly/image/type/method/field (Phase 4, sub-phase 4.3 phần còn lại). Chỉ khi header đạt kiểm tra chung và version có bố cục xác minh. Lỗi chỉ thành cảnh báo. --- */
+    step('tables', 'running', 'Trích xuất assembly/class/method/field');
+    try {
+      const mh2 = result.unity && result.unity.metadata_header;
+      if (!mh2 || mh2.status !== 'generic_ok') {
+        step('tables', 'skipped', 'Header metadata chưa đạt kiểm tra');
+      } else if (!NS.MetadataTables) {
+        throw new IpaError('NO_TABLES_MODULE', 'Thiếu module metadata_tables.js');
+      } else {
+        const tb = await NS.MetadataTables.extractTables(file, result.unity, entries, { isCancelled: cancelled });
+        result.unity.metadata_tables = tb;
+        const c = tb.counts || {};
+        log(tb.status === 'ok' ? 'SUCCESS' : 'WARNING', 'Bảng metadata: ' + tb.status + ' – ' + tb.reason, c);
+        step('tables', tb.status === 'ok' ? 'done' : (tb.status === 'unsupported_version' ? 'skipped' : 'error'), tb.status === 'ok' ? c.types + ' type, ' + c.methods + ' method, ' + c.fields + ' field' : tb.status);
+      }
+    } catch (e) {
+      if (e && e.code === 'CANCELLED') throw e;
+      warn('Trích xuất bảng metadata thất bại: ' + ((e && e.message) || e));
+      step('tables', 'error', (e && e.message) || 'Lỗi');
+    }
     progress(1);
     return result;
   }

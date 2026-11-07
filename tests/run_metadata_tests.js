@@ -2,7 +2,7 @@
 // Kiểm thử SUB-PHASE 4.2 (header + phiên bản global-metadata.dat). IPA/HEADER GIẢ LẬP do script tự dựng: chỉ chứng minh logic, không chứng minh độ chính xác trên metadata thật.
 const fs = require('fs'), path = require('path');
 globalThis.self = globalThis; globalThis.window = globalThis;
-['plist_parser', 'binary_reader', 'modules/hash', 'modules/magic_bytes', 'modules/archive_scanner', 'modules/detect_engine', 'modules/file_scanner', 'modules/unity_dump', 'modules/metadata_dump', 'ipa_reader'].forEach(function (f) {
+['plist_parser', 'binary_reader', 'modules/hash', 'modules/magic_bytes', 'modules/archive_scanner', 'modules/detect_engine', 'modules/file_scanner', 'modules/unity_dump', 'modules/metadata_dump', 'modules/metadata_tables', 'ipa_reader'].forEach(function (f) {
   (0, eval)(fs.readFileSync(path.join(__dirname, '..', 'js', f + '.js'), 'utf8'));
 });
 const NS = globalThis.IPAStudio, MD = NS.MetadataDump, dir = process.argv[2] || '/tmp/fake_ipas';

@@ -211,6 +211,7 @@
       components: all, components_found: found, components_total: all.length,
       metadata_input: input, main_binary: mainBinary,
       metadata_literals: null, // 4.3: MetadataDump.extractLiterals điền trong IpaReader.analyze
+      metadata_tables: null,   // 4.3: MetadataTables.extractTables điền trong IpaReader.analyze (assembly/image/type/method/field)
       metadata_header: null,   // 4.2: do MetadataDump.check điền trong IpaReader.analyze (discover thuần dữ liệu, không I/O)
       notes: notes, warnings: warnings
     };

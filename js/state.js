@@ -11,6 +11,7 @@
     { id: 'unity',    label: 'Unity IL2CPP (thành phần)' },
     { id: 'metadata', label: 'Metadata IL2CPP (header, phiên bản)' },
     { id: 'literals', label: 'Metadata IL2CPP (string literal)' },
+    { id: 'tables',   label: 'Metadata IL2CPP (assembly/class/method/field)' },
     { id: 'extract',  label: 'Trích xuất dữ liệu' },
     { id: 'fonts',    label: 'Phân tích font' },
     { id: 'report',   label: 'Tạo báo cáo' },

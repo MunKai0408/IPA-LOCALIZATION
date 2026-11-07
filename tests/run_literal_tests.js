@@ -2,7 +2,7 @@
 // Kiểm thử SUB-PHASE 4.3 (string literal). Metadata GIẢ LẬP dựng độc lập bằng Python: chỉ chứng minh logic, không chứng minh độ chính xác trên metadata thật.
 const fs = require('fs'), path = require('path');
 globalThis.self = globalThis; globalThis.window = globalThis;
-['plist_parser', 'binary_reader', 'modules/hash', 'modules/magic_bytes', 'modules/archive_scanner', 'modules/detect_engine', 'modules/file_scanner', 'modules/unity_dump', 'modules/metadata_dump', 'ipa_reader'].forEach(function (f) {
+['plist_parser', 'binary_reader', 'modules/hash', 'modules/magic_bytes', 'modules/archive_scanner', 'modules/detect_engine', 'modules/file_scanner', 'modules/unity_dump', 'modules/metadata_dump', 'modules/metadata_tables', 'ipa_reader'].forEach(function (f) {
   (0, eval)(fs.readFileSync(path.join(__dirname, '..', 'js', f + '.js'), 'utf8'));
 });
 const NS = globalThis.IPAStudio, MD = NS.MetadataDump, dir = process.argv[2] || '/tmp/fake_ipas';
@@ -74,7 +74,7 @@ const lit = async function (name) { const r = await run(name); return r.unity.me
   /* 6. Summary/report: nêu rõ phần chưa hỗ trợ, không bịa */
   { const r = await run('m43_ok_v24'), mh = r.unity.metadata_header, l = r.unity.metadata_literals;
     const sm = MD.toSummary(mh, l), rep = MD.toReportFields(mh, l);
-    ok(sm.schema === 'metadata_summary/2' && sm.partial === true && sm.string_literals.count === 9 && sm.string_literals.status === 'ok', 'toSummary');
+    ok(sm.schema === 'metadata_summary/3' && sm.partial === true && sm.string_literals.count === 9 && sm.string_literals.status === 'ok', 'toSummary');
     ok(['assemblies', 'namespaces', 'classes', 'methods', 'fields'].every(function (k) { return sm.not_supported[k].status === 'not_supported'; }), 'summary: assembly/namespace/class/method/field = not_supported');
     ok(rep.string_literals_count === 9 && rep.metadata_not_supported.length === 5, 'toReportFields'); }
 

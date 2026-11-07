@@ -1,30 +1,28 @@
-# NEXT_TASK.md – dành cho Account 05
+# NEXT_TASK.md – dành cho Account 06
 
-> CẬP NHẬT (Account 04, 4.3 một phần): string literal đã xong. CÒN THIẾU của 4.3: assembly/namespace/class/method/field + dump.cs (cần nguồn xác minh bố cục struct; xem HANDOFF). Ưu tiên: hỏi người dùng log/ảnh trên IPA Unity IL2CPP thật (thẻ “Header metadata” + “String literal”) và/hoặc file `MetadataClasses.cs`. Nếu chưa có, hỏi người dùng muốn (a) chờ phần còn thiếu hay (b) sang SUB-PHASE 5.1 Font Discovery. Test phải đạt 359/112/86/72/53 (thêm `python3 tests/make_literal_ipas.py /tmp/fake_ipas` và `node tests/run_literal_tests.js /tmp/fake_ipas`). Phần dưới là kế hoạch 4.3 gốc (string literal đã làm).
-
-## SUB-PHASE KẾ TIẾP: 4.3 — METADATA EXTRACTION AND REPORT
-Prompt (mục 27): “Trích xuất dữ liệu metadata theo phạm vi gốc và hiển thị kết quả.” Gốc (mục 10, 16): string literal, assembly/namespace/class/method/field nếu parser hỗ trợ; đầu ra `Meta/metadata_summary.json`, `Meta/dump.cs` hoặc JSON tương đương, `Text/unity_string_literals.json`, ghi vào report. Mỗi lượt CHỈ một sub-phase; xong 4.3 thì dừng, không sang Phase 5.
+## SUB-PHASE KẾ TIẾP: 5.1 — FONT DISCOVERY AND EXTRACTION
+Prompt (mục 27, PHASE 5): “Phát hiện, đọc và trích xuất các file font được hỗ trợ.” Gốc: mục 12 (font_dump.js, vùng *.ttf/*.otf/*.ttc/*.woff/*.woff2/*.fnt/*.bmfont/*.atlas, đầu ra `Fonts/original/`, `Fonts/fonts.json`, `Fonts/font_index.json`). Mỗi lượt CHỈ một sub-phase; xong 5.1 thì dừng. KHÔNG làm 5.2 (metadata font/TMP) hay 5.3 (độ phủ tiếng Việt).
 
 ## Trước khi làm (bắt buộc)
-1. Đọc `HANDOFF.md`, `INTERFACES.md` (mục 4.1 và 4.2), file này, prompt mục 3, 10, 16, 22, 27 (PHASE 4), 28. Mã nguồn là căn cứ nếu tài liệu mâu thuẫn.
-2. Giải nén zip, `node --check` mọi JS, chạy: `python3 tests/make_fake_ipas.py /tmp/fake_ipas && python3 tests/make_scan_ipa.py /tmp/fake_ipas && python3 tests/make_unity_ipas.py /tmp/fake_ipas && python3 tests/make_metadata_ipas.py /tmp/fake_ipas` rồi 4 bộ test (phải đạt 359 / 112 / 86 / 72).
-3. Không viết lại Phase 0–4.2, không đổi kiến trúc.
-4. Hỏi người dùng log/ảnh chụp trên IPA Unity IL2CPP THẬT (kết quả thẻ “Header metadata”, version thật). Nếu 4.2 cho kết quả sai trên dữ liệu thật, sửa 4.2 trước.
+1. Đọc `HANDOFF.md`, `INTERFACES.md` (mục Phase 3 file_scanner/manifest và mục 4.3), file này; prompt mục 3, 12, 22, 24, 27 (PHASE 5), 28. Mã nguồn là căn cứ nếu tài liệu mâu thuẫn.
+2. Giải nén zip, `node --check` mọi JS, tạo IPA giả và chạy: `D=/tmp/fake_ipas; python3 tests/make_fake_ipas.py $D && python3 tests/make_scan_ipa.py $D && python3 tests/make_unity_ipas.py $D && python3 tests/make_metadata_ipas.py $D && python3 tests/make_literal_ipas.py $D && python3 tests/make_tables_ipas.py $D` rồi 6 bộ test: detect **359**, scan **112**, unity **86**, metadata **72**, literal **53**, tables **300** (`node tests/run_<tên>_tests.js $D`; tables/literal cần đủ các IPA của make_metadata_ipas.py).
+3. Không viết lại Phase 0–4, không đổi kiến trúc.
+4. Hỏi người dùng (nếu chưa có): log/ảnh trên IPA Unity IL2CPP THẬT — thẻ “Header metadata”, “String literal”, “Assembly/class/method/field”, version thật. Nếu kết quả thật sai thì sửa Phase 4 trước (đặc biệt giả định cặp header #0/#1 và nhận diện v24.x).
 
-## Phạm vi 4.3
-- **Việc đầu tiên: xác minh bố cục header + bảng cho từng version cần hỗ trợ từ nguồn đáng tin** (4.2 chưa có version nào xác minh ở mức trường; xem HANDOFF). Nguồn gợi ý: `Perfare/Il2CppDumper` (`MetadataClasses.cs`, `Metadata.cs`), il2cpp_dumper (`structures.rs`, `metadata.rs`) — dùng WebSearch rồi WebFetch link kết quả. Ghi nguồn + version trong code và INTERFACES.md. Version nào không xác minh được → `unsupported`, không đoán offset.
-- Chỉ chạy khi `metadata_header.status === 'generic_ok'` và version nằm trong tập đã xác minh; các trạng thái khác: không trích xuất, nêu lý do, không làm dừng pipeline.
-- Đọc bảng cần thiết theo offset/size trong file qua `IpaReader.readEntry` không phải đủ (giới hạn kích thước) → dùng `streamEntry`/đọc theo vùng có giới hạn bộ nhớ; metadata có thể hàng chục MB, có tiến trình + hủy. Không nạp mọi thứ vào RAM nếu không cần.
-- Trích xuất (theo parser đã xác minh): string literal (bảng literal + dữ liệu), assembly/image, namespace, class, method, field; không tự tạo tên, không suy diễn offset. Xuất: `Meta/metadata_summary.json` (mở rộng `toSummary`, bỏ `partial` khi đủ), `Meta/dump.cs` hoặc JSON tương đương, `Text/unity_string_literals.json`, trường báo cáo (mở rộng `toReportFields`). Hiển thị kết quả trong view “Unity / Metadata” (bảng có tìm kiếm, tải JSON).
-- Chuỗi: UTF-8 đúng theo dữ liệu; lỗi giải mã ghi cờ, không bỏ chuỗi im lặng. Escape khi hiển thị (đã có h()).
-- Không giải mã/obfuscation, không vượt FairPlay.
+## Phạm vi 5.1 (gợi ý, đối chiếu lại với prompt mục 12)
+- Module mới `js/modules/font_dump.js` (`NS.FontDump`), dùng manifest Phase 3 (`session.results.manifest`) để tìm font theo magic bytes (TTF/OTF/TTC/WOFF/WOFF2 đã có trong magic_bytes.js) VÀ theo đuôi (.fnt/.bmfont/.atlas là text/BMFont, không tin đuôi hoàn toàn).
+- Trích xuất NGUYÊN BẢN các file font truy cập được (đọc bằng `IpaReader.streamEntry`/`readEntry` có giới hạn kích thước, hủy được) vào vùng kết quả riêng (`Fonts/original/`); giữ đường dẫn gốc, SHA từ manifest; không sửa IPA. Chống path traversal (dùng `entry.unsafe`/tên đã chuẩn hóa như Phase 3).
+- `Fonts/font_index.json`: mỗi font = {path trong IPA, kích thước, định dạng (theo magic), sha1/sha256 nếu có, trạng thái trích xuất, lỗi}; `Fonts/fonts.json` ở mức 5.1 chỉ có phần phát hiện (KHÔNG gồm family/glyph/độ phủ – thuộc 5.2/5.3; để trường rỗng/ghi rõ “chưa phân tích”, không bịa).
+- Font nằm trong UnityFS/asset bundle/TMP atlas: 5.1 chỉ ghi nhận “chưa giải được” (không parse bundle); `UIAppFonts` trong Info.plist (đã có ở `ipa.app.appFonts`) đối chiếu với file thật tìm được.
+- Giao diện: view “Font” (hiện đang placeholder, `data-view="fonts"` hoặc tương tự – kiểm tra index.html): danh sách font phát hiện, tìm kiếm, tải từng font, tải JSON. Bước pipeline `fonts` đã có sẵn trong `State.PIPELINE_STEPS` (đang “Chờ”).
+- Báo cáo: thêm trường font vào `toReportFields` của module mới; số liệu tính từ dữ liệu thật.
 
-## Tiêu chí nghiệm thu 4.3
-1. Metadata GIẢ LẬP đúng bố cục đã xác minh (nêu rõ giả lập) → số lượng và nội dung trích xuất đối chiếu được với bytes dựng độc lập (Python).
-2. Version chưa xác minh/bảng trỏ ra ngoài file/chỉ số vượt phạm vi → lỗi có cấu trúc, không crash, không đoán.
-3. Kiểm soát bộ nhớ trên file lớn; test hủy giữa chừng.
-4. 4 bộ test cũ vẫn đạt + test mới; Chromium headless kiểm view; cập nhật `INTERFACES.md`, `HANDOFF.md`, `NEXT_TASK.md` (trỏ sang Phase 5 / SUB-PHASE 5.1), `README.md`.
+## Tiêu chí nghiệm thu 5.1
+1. IPA giả lập có TTF/OTF/TTC/WOFF/WOFF2/.fnt thật (dựng độc lập bằng Python, nêu rõ giả lập) → danh sách phát hiện và byte trích xuất khớp từng file (SHA-256 đối chiếu hashlib).
+2. File đổi đuôi (đuôi .ttf nhưng không phải font; font không đuôi) xử lý đúng theo magic bytes; file font rỗng/cắt cụt/hỏng → lỗi có cấu trúc, không crash; entry mã hóa/không an toàn bị từ chối.
+3. Kiểm soát bộ nhớ (font lớn, nhiều font), có hủy; test mới + 6 bộ test cũ vẫn đạt; Chromium headless kiểm view (khung 390 px, 0 lỗi JS, 0 request ngoài).
+4. Cập nhật `INTERFACES.md`, `HANDOFF.md`, `NEXT_TASK.md` (trỏ sang SUB-PHASE 5.2), `README.md`.
 
 ## Quy tắc bàn giao
-- Gần hết ngữ cảnh/tài nguyên: dừng, cập nhật 3 file, báo người dùng; không tuyên bố commit/push nếu chưa thành công. Zip gửi lên GitHub cố ý KHÔNG kèm `.git`.
-- Không sang Phase 5 khi chưa được yêu cầu.
+- Gần hết ngữ cảnh/tài nguyên: dừng, cập nhật 3 file, báo người dùng; không tuyên bố commit/push nếu chưa thành công (hiện không có GitHub liên kết, zip không kèm `.git`).
+- Không sang 5.2 khi chưa được yêu cầu.

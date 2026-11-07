@@ -2,7 +2,7 @@
 
 Website phân tích **tĩnh** file IPA game iOS ngay trong trình duyệt để phục vụ Việt hóa. Không backend, không upload dữ liệu.
 
-> Trạng thái: **Phase 4 – sub-phase 4.1 (Unity Component Discovery) hoàn thành**, trên nền Phase 0–3 (đọc IPA, Info.plist, Mach-O/FairPlay, nhận diện engine, quét file + manifest). Header/phiên bản metadata (4.2), trích xuất metadata (4.3), font, chuỗi… ở các bước sau.
+> Trạng thái: **Phase 4 (4.1, 4.2, 4.3) hoàn thành trên dữ liệu GIẢ LẬP** (4.3 gồm string literal, assembly/image/type/method/field, dump.cs; chưa kiểm thử trên metadata thật). Dòng cũ: sub-phase 4.1 (Unity Component Discovery), trên nền Phase 0–3 (đọc IPA, Info.plist, Mach-O/FairPlay, nhận diện engine, quét file + manifest). Header/phiên bản metadata (4.2), trích xuất metadata (4.3), font, chuỗi… ở các bước sau.
 
 ## Chạy thử
 
@@ -11,11 +11,17 @@ Không cần cài đặt hay build. Code dùng script thường (không ES modul
 - **Máy tính:** mở `index.html` bằng trình duyệt, hoặc chạy `python3 -m http.server 8000` rồi vào `http://localhost:8000`.
 - **GitHub Pages (khuyên dùng khi dùng iPhone):** repo → Settings → Pages → Source: *Deploy from a branch* → Branch `main`, thư mục `/ (root)` → Save. Sau 1–2 phút mở `https://<user>.github.io/<repo>/`.
 
+## Kiểm tra Phase 4.3 (assembly/image/type/method/field + dump.cs)
+```
+D=/tmp/fake_ipas; python3 tests/make_tables_ipas.py $D && python3 tests/make_literal_ipas.py $D && python3 tests/make_metadata_ipas.py $D && node tests/run_tables_tests.js $D   # 300
+```
+Bố cục struct lấy từ mã nguồn Il2CppDumper (commit 4741d46, xem `js/modules/metadata_tables.js`); test đối chiếu với schema dẫn xuất tự động từ file C# (`tests/derive_schema_from_cs.py`). Hỗ trợ version 16, 17, 19, 20, 21, 22, 24 (24.0/24.1/24.2/24.4), 27, 29, 31. Tên kiểu của field/tham số KHÔNG có (nằm trong binary). Test dùng metadata GIẢ LẬP.
+
 ## Kiểm tra Phase 4.3 (string literal)
 ```
 python3 tests/make_literal_ipas.py /tmp/fake_ipas && node tests/run_literal_tests.js /tmp/fake_ipas   # 53 (cần cả make_metadata_ipas.py cho 6 ca “không đủ điều kiện”)
 ```
-Chỉ trích xuất string literal (v16–31 đã đối chiếu). Class/method/field/dump.cs CHƯA hỗ trợ. Test dùng metadata GIẢ LẬP.
+Trích xuất string literal (v16–31 đã đối chiếu). Test dùng metadata GIẢ LẬP.
 
 ## Kiểm tra Phase 4.2 (Header và phiên bản global-metadata.dat)
 ```

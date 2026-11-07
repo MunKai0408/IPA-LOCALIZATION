@@ -1,5 +1,6 @@
 /* metadata_dump.js – Phase 4: SUB-PHASE 4.2 (kiểm tra HEADER và PHIÊN BẢN của global-metadata.dat) + SUB-PHASE 4.3 (trích xuất STRING LITERAL).
-   4.2 chỉ đọc phần đầu file (≤ READ_LIMIT byte). 4.3 chỉ trích xuất string literal (xem extractLiterals); assembly/namespace/class/method/field và dump.cs CHƯA hỗ trợ vì bố cục struct chưa được xác minh.
+   4.2 chỉ đọc phần đầu file (≤ READ_LIMIT byte). 4.3 ở file này chỉ trích xuất string literal (extractLiterals); assembly/image/class/method/field và dump.cs nằm ở js/modules/metadata_tables.js
+   (bố cục đã xác minh từ mã nguồn Il2CppDumper; phần ghi chú “chưa xác minh” bên dưới là lịch sử của 4.2 và chỉ còn đúng cho phần kiểm tra chung ở inspectHeader).
    KHÔNG giải mã, KHÔNG phá obfuscation. Chạy được ở Worker và luồng chính.
 
    Về độ tin cậy của bố cục (quan trọng):
@@ -295,21 +296,29 @@
   }
 
   /** Phần Unity metadata của report.json (Phase 9 gộp). */
-  function toReportFields(h, lit) {
+  function toReportFields(h, lit, tables) {
     if (!h) return null;
     const o = { metadata_header_status: h.status, metadata_version: h.version ? h.version.value : null, metadata_header_generic_checked: h.status === 'generic_ok' };
     if (lit) { o.string_literals_status = lit.status; o.string_literals_count = lit.count; o.string_literals_invalid_utf8 = lit.invalid_utf8; o.string_literals_out_of_range = lit.out_of_range; }
-    o.metadata_not_supported = NOT_SUPPORTED.slice();
+    if (tables && tables.status === 'ok' && NS.MetadataTables) { Object.assign(o, NS.MetadataTables.toReportFields(tables)); o.metadata_not_supported = []; }
+    else { if (tables) o.metadata_tables_status = tables.status; o.metadata_not_supported = NOT_SUPPORTED.slice(); }
     return o;
   }
 
-  /** Nội dung PHẦN header của Meta/metadata_summary.json (4.3 sẽ bổ sung phần trích xuất). */
-  function toSummary(h, lit) {
+  /** Nội dung Meta/metadata_summary.json. tables (tùy chọn) = kết quả MetadataTables.extractTables; không có hoặc không ok → partial=true và liệt kê phần chưa có. */
+  function toSummary(h, lit, tables) {
     if (!h) return null;
-    const ns = {}; NOT_SUPPORTED.forEach(function (k) { ns[k] = { status: 'not_supported', reason: NOT_SUPPORTED_REASON }; });
-    return { schema: 'metadata_summary/2', sub_phase: '4.3', partial: true,
-             note: 'Có header/version (4.2) và string literal (4.3, nếu status=ok). Chưa có assembly/namespace/class/method/field và dump.cs (bố cục struct chưa xác minh).',
-             header: h,
+    const tOk = !!(tables && tables.status === 'ok');
+    const ns = {};
+    if (!tOk) NOT_SUPPORTED.forEach(function (k) {
+      ns[k] = { status: 'not_supported', reason: tables ? 'Bảng metadata: ' + tables.status + ' – ' + tables.reason : 'Chưa chạy trích xuất bảng metadata (cần header generic_ok và version có bố cục xác minh).' };
+    });
+    const tsum = tables ? { status: tables.status, reason: tables.reason, version: tables.version, layout: tables.layout, counts: tables.counts, struct_sizes: tables.struct_sizes,
+      problem_counts: tables.problem_counts, name_problems: tables.name_problems, not_extracted: tables.not_extracted, reference_sources: tables.reference_sources, notes: tables.notes } : null;
+    return { schema: 'metadata_summary/3', sub_phase: '4.3', partial: !tOk,
+             note: tOk ? 'Đầy đủ phạm vi 4.3: header/version (4.2), string literal, assembly/image/type/method/field. Tên kiểu của field/tham số/return KHÔNG có (nằm trong binary); xem tables.not_extracted.'
+                       : 'Có header/version (4.2) và string literal (nếu status=ok). Bảng assembly/class/method/field chưa có: xem not_supported.',
+             header: h, tables: tsum,
              string_literals: lit ? { status: lit.status, reason: lit.reason, version: lit.version, count: lit.count, empty: lit.empty, distinct: lit.distinct, invalid_utf8: lit.invalid_utf8, out_of_range: lit.out_of_range, total_text_bytes: lit.total_text_bytes, source: lit.source } : null,
              not_supported: ns };
   }

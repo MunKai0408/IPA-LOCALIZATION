@@ -1,0 +1,1149 @@
+{
+ "source": "Perfare/Il2CppDumper Il2CppDumper/Il2Cpp/MetadataClass.cs",
+ "commit": "4741d46ba9cd6159c5d853eb9d6fc48b4bfa2b1a",
+ "classes": {
+  "Il2CppGlobalMetadataHeader": [
+   {
+    "name": "sanity",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "version",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "stringLiteralOffset",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "stringLiteralSize",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "stringLiteralDataOffset",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "stringLiteralDataSize",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "stringOffset",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "stringSize",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "eventsOffset",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "eventsSize",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "propertiesOffset",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "propertiesSize",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "methodsOffset",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "methodsSize",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "parameterDefaultValuesOffset",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "parameterDefaultValuesSize",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "fieldDefaultValuesOffset",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "fieldDefaultValuesSize",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "fieldAndParameterDefaultValueDataOffset",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "fieldAndParameterDefaultValueDataSize",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "fieldMarshaledSizesOffset",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "fieldMarshaledSizesSize",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "parametersOffset",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "parametersSize",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "fieldsOffset",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "fieldsSize",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "genericParametersOffset",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "genericParametersSize",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "genericParameterConstraintsOffset",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "genericParameterConstraintsSize",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "genericContainersOffset",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "genericContainersSize",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "nestedTypesOffset",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "nestedTypesSize",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "interfacesOffset",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "interfacesSize",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "vtableMethodsOffset",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "vtableMethodsSize",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "interfaceOffsetsOffset",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "interfaceOffsetsSize",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "typeDefinitionsOffset",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "typeDefinitionsSize",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "rgctxEntriesOffset",
+    "type": "uint",
+    "min": 0,
+    "max": 24.1,
+    "len": null
+   },
+   {
+    "name": "rgctxEntriesCount",
+    "type": "int",
+    "min": 0,
+    "max": 24.1,
+    "len": null
+   },
+   {
+    "name": "imagesOffset",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "imagesSize",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "assembliesOffset",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "assembliesSize",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "metadataUsageListsOffset",
+    "type": "uint",
+    "min": 19,
+    "max": 24.5,
+    "len": null
+   },
+   {
+    "name": "metadataUsageListsCount",
+    "type": "int",
+    "min": 19,
+    "max": 24.5,
+    "len": null
+   },
+   {
+    "name": "metadataUsagePairsOffset",
+    "type": "uint",
+    "min": 19,
+    "max": 24.5,
+    "len": null
+   },
+   {
+    "name": "metadataUsagePairsCount",
+    "type": "int",
+    "min": 19,
+    "max": 24.5,
+    "len": null
+   },
+   {
+    "name": "fieldRefsOffset",
+    "type": "uint",
+    "min": 19,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "fieldRefsSize",
+    "type": "int",
+    "min": 19,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "referencedAssembliesOffset",
+    "type": "int",
+    "min": 20,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "referencedAssembliesSize",
+    "type": "int",
+    "min": 20,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "attributesInfoOffset",
+    "type": "uint",
+    "min": 21,
+    "max": 27.2,
+    "len": null
+   },
+   {
+    "name": "attributesInfoCount",
+    "type": "int",
+    "min": 21,
+    "max": 27.2,
+    "len": null
+   },
+   {
+    "name": "attributeTypesOffset",
+    "type": "uint",
+    "min": 21,
+    "max": 27.2,
+    "len": null
+   },
+   {
+    "name": "attributeTypesCount",
+    "type": "int",
+    "min": 21,
+    "max": 27.2,
+    "len": null
+   },
+   {
+    "name": "attributeDataOffset",
+    "type": "uint",
+    "min": 29,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "attributeDataSize",
+    "type": "int",
+    "min": 29,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "attributeDataRangeOffset",
+    "type": "uint",
+    "min": 29,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "attributeDataRangeSize",
+    "type": "int",
+    "min": 29,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "unresolvedVirtualCallParameterTypesOffset",
+    "type": "int",
+    "min": 22,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "unresolvedVirtualCallParameterTypesSize",
+    "type": "int",
+    "min": 22,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "unresolvedVirtualCallParameterRangesOffset",
+    "type": "int",
+    "min": 22,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "unresolvedVirtualCallParameterRangesSize",
+    "type": "int",
+    "min": 22,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "windowsRuntimeTypeNamesOffset",
+    "type": "int",
+    "min": 23,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "windowsRuntimeTypeNamesSize",
+    "type": "int",
+    "min": 23,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "windowsRuntimeStringsOffset",
+    "type": "int",
+    "min": 27,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "windowsRuntimeStringsSize",
+    "type": "int",
+    "min": 27,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "exportedTypeDefinitionsOffset",
+    "type": "int",
+    "min": 24,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "exportedTypeDefinitionsSize",
+    "type": "int",
+    "min": 24,
+    "max": 99,
+    "len": null
+   }
+  ],
+  "Il2CppAssemblyDefinition": [
+   {
+    "name": "imageIndex",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "token",
+    "type": "uint",
+    "min": 24.1,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "customAttributeIndex",
+    "type": "int",
+    "min": 0,
+    "max": 24,
+    "len": null
+   },
+   {
+    "name": "referencedAssemblyStart",
+    "type": "int",
+    "min": 20,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "referencedAssemblyCount",
+    "type": "int",
+    "min": 20,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "aname",
+    "type": "Il2CppAssemblyNameDefinition",
+    "min": 0,
+    "max": 99,
+    "len": null
+   }
+  ],
+  "Il2CppAssemblyNameDefinition": [
+   {
+    "name": "nameIndex",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "cultureIndex",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "hashValueIndex",
+    "type": "int",
+    "min": 0,
+    "max": 24.3,
+    "len": null
+   },
+   {
+    "name": "publicKeyIndex",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "hash_alg",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "hash_len",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "flags",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "major",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "minor",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "build",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "revision",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "public_key_token",
+    "type": "byte[]",
+    "min": 0,
+    "max": 99,
+    "len": 8
+   }
+  ],
+  "Il2CppImageDefinition": [
+   {
+    "name": "nameIndex",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "assemblyIndex",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "typeStart",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "typeCount",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "exportedTypeStart",
+    "type": "int",
+    "min": 24,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "exportedTypeCount",
+    "type": "uint",
+    "min": 24,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "entryPointIndex",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "token",
+    "type": "uint",
+    "min": 19,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "customAttributeStart",
+    "type": "int",
+    "min": 24.1,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "customAttributeCount",
+    "type": "uint",
+    "min": 24.1,
+    "max": 99,
+    "len": null
+   }
+  ],
+  "Il2CppTypeDefinition": [
+   {
+    "name": "nameIndex",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "namespaceIndex",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "customAttributeIndex",
+    "type": "int",
+    "min": 0,
+    "max": 24,
+    "len": null
+   },
+   {
+    "name": "byvalTypeIndex",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "byrefTypeIndex",
+    "type": "int",
+    "min": 0,
+    "max": 24.5,
+    "len": null
+   },
+   {
+    "name": "declaringTypeIndex",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "parentIndex",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "elementTypeIndex",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "rgctxStartIndex",
+    "type": "int",
+    "min": 0,
+    "max": 24.1,
+    "len": null
+   },
+   {
+    "name": "rgctxCount",
+    "type": "int",
+    "min": 0,
+    "max": 24.1,
+    "len": null
+   },
+   {
+    "name": "genericContainerIndex",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "delegateWrapperFromManagedToNativeIndex",
+    "type": "int",
+    "min": 0,
+    "max": 22,
+    "len": null
+   },
+   {
+    "name": "marshalingFunctionsIndex",
+    "type": "int",
+    "min": 0,
+    "max": 22,
+    "len": null
+   },
+   {
+    "name": "ccwFunctionIndex",
+    "type": "int",
+    "min": 21,
+    "max": 22,
+    "len": null
+   },
+   {
+    "name": "guidIndex",
+    "type": "int",
+    "min": 21,
+    "max": 22,
+    "len": null
+   },
+   {
+    "name": "flags",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "fieldStart",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "methodStart",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "eventStart",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "propertyStart",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "nestedTypesStart",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "interfacesStart",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "vtableStart",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "interfaceOffsetsStart",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "method_count",
+    "type": "ushort",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "property_count",
+    "type": "ushort",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "field_count",
+    "type": "ushort",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "event_count",
+    "type": "ushort",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "nested_type_count",
+    "type": "ushort",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "vtable_count",
+    "type": "ushort",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "interfaces_count",
+    "type": "ushort",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "interface_offsets_count",
+    "type": "ushort",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "bitfield",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "token",
+    "type": "uint",
+    "min": 19,
+    "max": 99,
+    "len": null
+   }
+  ],
+  "Il2CppMethodDefinition": [
+   {
+    "name": "nameIndex",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "declaringType",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "returnType",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "returnParameterToken",
+    "type": "int",
+    "min": 31,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "parameterStart",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "customAttributeIndex",
+    "type": "int",
+    "min": 0,
+    "max": 24,
+    "len": null
+   },
+   {
+    "name": "genericContainerIndex",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "methodIndex",
+    "type": "int",
+    "min": 0,
+    "max": 24.1,
+    "len": null
+   },
+   {
+    "name": "invokerIndex",
+    "type": "int",
+    "min": 0,
+    "max": 24.1,
+    "len": null
+   },
+   {
+    "name": "delegateWrapperIndex",
+    "type": "int",
+    "min": 0,
+    "max": 24.1,
+    "len": null
+   },
+   {
+    "name": "rgctxStartIndex",
+    "type": "int",
+    "min": 0,
+    "max": 24.1,
+    "len": null
+   },
+   {
+    "name": "rgctxCount",
+    "type": "int",
+    "min": 0,
+    "max": 24.1,
+    "len": null
+   },
+   {
+    "name": "token",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "flags",
+    "type": "ushort",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "iflags",
+    "type": "ushort",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "slot",
+    "type": "ushort",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "parameterCount",
+    "type": "ushort",
+    "min": 0,
+    "max": 99,
+    "len": null
+   }
+  ],
+  "Il2CppParameterDefinition": [
+   {
+    "name": "nameIndex",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "token",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "customAttributeIndex",
+    "type": "int",
+    "min": 0,
+    "max": 24,
+    "len": null
+   },
+   {
+    "name": "typeIndex",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   }
+  ],
+  "Il2CppFieldDefinition": [
+   {
+    "name": "nameIndex",
+    "type": "uint",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "typeIndex",
+    "type": "int",
+    "min": 0,
+    "max": 99,
+    "len": null
+   },
+   {
+    "name": "customAttributeIndex",
+    "type": "int",
+    "min": 0,
+    "max": 24,
+    "len": null
+   },
+   {
+    "name": "token",
+    "type": "uint",
+    "min": 19,
+    "max": 99,
+    "len": null
+   }
+  ]
+ }
+}

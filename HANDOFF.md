@@ -1,5 +1,31 @@
 # HANDOFF.md
 
+## Phiên hiện tại: Account 05 (hoàn tất SUB-PHASE 4.3) → bàn giao cho Account 06
+Vòng quay: 01 → 02 → … → 10 → 01.
+
+## Sub-phase 4.3 – METADATA EXTRACTION AND REPORT: HOÀN THÀNH (trên dữ liệu giả lập)
+Account 04 đã làm string literal; **Account 05 đã làm phần còn thiếu: assembly / image / namespace / class / method / field + Meta/dump.cs + báo cáo + UI.**
+**Điều kiện được thỏa:** nguồn xác minh bố cục lấy được bằng `git clone --depth 1 https://github.com/Perfare/Il2CppDumper` (qua proxy của phiên; WebFetch trước đó chỉ trả tóm tắt). Đã đọc đầy đủ `MetadataClass.cs`, `Metadata.cs`, `Outputs/Il2CppConstants.cs`, `Outputs/Il2CppDecompiler.cs` ở commit `4741d46ba9cd6159c5d853eb9d6fc48b4bfa2b1a`. Đây là cách làm được cho các nguồn khác nếu cần (git clone thay vì WebFetch).
+Tạo: `js/modules/metadata_tables.js`, `tests/derive_schema_from_cs.py`, `tests/fixtures/il2cpp_struct_schema.json`, `tests/make_tables_ipas.py`, `tests/run_tables_tests.js`.
+Sửa: `js/ipa_reader.js` (bước 8 `tables`), `js/state.js` (bước `tables`), `js/workers/ipa.worker.js` + `index.html` (nạp module; 2 nút tải), `js/modules/unity_dump.js` (trường `metadata_tables:null`), `js/modules/metadata_dump.js` (`toSummary`/`toReportFields` nhận `tables`, summary → `/3`, sửa chú thích đầu file), `js/ui.js` (`buildTablesCard`, `buildPagedTable`, bỏ câu “chưa hỗ trợ”), `js/events.js` (nút dump.cs / metadata_tables.json, truyền tables vào toSummary), `js/app.js` (0.8.0-phase4.3), `tests/run_literal_tests.js` (nạp module mới + schema `/3`), `tests/run_metadata_tests.js` (nạp module mới), README/INTERFACES/NEXT_TASK/HANDOFF.
+
+### Kiểm thử đã chạy (Account 05) – TẤT CẢ TRÊN DỮ LIỆU GIẢ LẬP
+- `node tests/run_tables_tests.js` **300 đạt**: schema JS == schema dẫn xuất tự động từ file C# (8 struct × 15 version, gồm 24.1/24.2/24.3/24.4/24.5); 18 IPA giả lập (v16, 17, 19, 20, 21, 22, 24.0, 24.1, 24.1+, 24.2, 24.4, 27, 29 [deflate+stored], 31, và v24.x với 20 image) khớp từng assembly/image/type/method/field/tham số/token/cờ với bản dựng độc lập bằng Python; v33 unsupported; method range vượt, tên ngoài vùng, bảng không chia hết struct (`layout_mismatch`), stringSize vượt file (4.2 chặn); 6 ca không đủ điều kiện → skipped; parseHeader/planRegions/decodeTables với đầu vào xấu; dump.cs; quy mô 20.000 type / 200.000 method / 100.000 field (~0,6 s trong Node, heap ~320 MiB); hủy giữa chừng; đầu vào xấu. Mutation test: sửa sai 1 trường schema → test fail.
+- Hồi quy: detect 359, scan 112, unity 86, metadata 72, literal 53 – đều đạt.
+- Chromium headless (http): v29, 200.000 method ở khung 390 px, v33 (unsupported), bảng không chia hết (layout_mismatch): thẻ, chọn bảng, tìm kiếm, tải `dump.cs` / `metadata_tables.json` / `metadata_summary.json` (v3, partial=false) đúng; 0 lỗi JS, 0 request ra ngoài, không tràn ngang.
+**Chưa kiểm thử:** metadata THẬT (mọi version), Safari iPhone thật, bộ nhớ trên iPhone với metadata lớn (giới hạn 128 MiB string / 192 MiB bảng là ước lượng, chưa đo trên thiết bị), v24.3/24.5 chưa có IPA giả lập riêng (cùng bố cục 24.2/24.4, chỉ đối chiếu schema).
+
+### Quyết định / lưu ý
+- Tên kiểu của field/tham số/return/parent nằm trong bảng `Il2CppType` của binary → chỉ giữ chỉ số thô (`*_raw_index`); KHÔNG đọc binary, KHÔNG suy tên kiểu, KHÔNG có RVA/offset. Ghi rõ trong `not_extracted`, dump.cs và UI.
+- Nhận diện v24.2/24.4 và 24.1/24.1+ bằng kích thước assembly khớp chính xác (khác tham chiếu, có lý do trong INTERFACES.md).
+- Metadata nhỏ → vẫn đọc hai lượt (literals rồi tables). Nếu IPA thật chậm, gộp hai lượt thành một (tối ưu sau, chưa đo).
+- `dump.cs` sinh khi bấm nút (từ `toDumpCs`), không lưu trong state.
+
+### Hạn chế còn tồn tại
+- Như 4.1/4.2. Bước 0 (log/ảnh IPA THẬT của Phase 2–4) vẫn chưa có dữ liệu từ người dùng. Nên xin trước khi sang Phase 5 nếu có thể; nếu 4.x sai trên dữ liệu thật thì sửa trước.
+- **Git/GitHub:** phiên này không có GitHub account liên kết (`list_repos` báo “no GitHub account linked”) và zip không có `.git` → KHÔNG commit/push được. Người dùng cần tự đưa zip lên repo như các lượt trước.
+
+---
 ## Phiên hiện tại: Account 04 (SUB-PHASE 4.3) → bàn giao cho Account 05
 Vòng quay: 01 → 02 → … → 10 → 01.
 
