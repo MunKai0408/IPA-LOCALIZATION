@@ -1,0 +1,12 @@
+/* reset.css – chuẩn hóa nền tảng */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body, h1, h2, h3, h4, p, ul, ol, figure, dl, dd { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; background: none; border: 0; padding: 0; }
+button:disabled { cursor: not-allowed; }
+img, svg { display: block; max-width: 100%; }
+a { color: inherit; }
+table { border-collapse: collapse; width: 100%; }
+[hidden] { display: none !important; }

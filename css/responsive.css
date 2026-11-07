@@ -1,0 +1,20 @@
+/* responsive.css – ưu tiên iPhone */
+@media (max-width: 900px) {
+  .app { grid-template-columns: 1fr; }
+  .sidebar {
+    position: fixed; left: 0; top: 0; bottom: 0; width: min(280px, 85vw);
+    transform: translateX(-100%); transition: transform .2s ease; box-shadow: var(--shadow);
+  }
+  body.nav-open .sidebar { transform: none; }
+  .menu-btn { display: inline-flex; }
+  .topbar { padding: 0 var(--space-3); }
+  .content { padding: var(--space-4) var(--space-4) calc(var(--space-6) + env(safe-area-inset-bottom)); }
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+  .toasts { left: var(--space-4); right: var(--space-4); max-width: none; bottom: calc(var(--space-4) + env(safe-area-inset-bottom)); }
+}
+@media (max-width: 380px) {
+  .stat-grid { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}

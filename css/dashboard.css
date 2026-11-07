@@ -1,0 +1,30 @@
+/* dashboard.css – thẻ thống kê, vùng nhập IPA, tiến trình */
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: var(--space-3); }
+.stat { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-3) var(--space-4); min-width: 0; }
+.stat-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .05em; }
+.stat-value { font-size: 20px; font-weight: 700; margin-top: 2px; overflow-wrap: anywhere; }
+.stat-value.is-empty { color: var(--text-dim); font-weight: 500; }
+
+.dropzone {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-2);
+  text-align: center; padding: var(--space-6) var(--space-4);
+  border: 2px dashed var(--border); border-radius: var(--radius);
+  background: var(--bg-elev); color: var(--text-dim); transition: border-color .15s, background .15s;
+}
+.dropzone.dragover { border-color: var(--accent); background: var(--bg-elev-2); }
+.dropzone.has-file { border-style: solid; }
+.dropzone .dz-icon { font-size: 32px; }
+.dropzone strong { color: var(--text); }
+
+.file-info { display: grid; grid-template-columns: auto 1fr; gap: 4px var(--space-4); margin-top: var(--space-3); font-size: 14px; }
+.file-info dt { color: var(--text-dim); }
+.file-info dd { overflow-wrap: anywhere; }
+
+.steps { display: flex; flex-direction: column; gap: var(--space-2); }
+.step { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) 0; }
+.step-dot { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border); flex: none; display: grid; place-items: center; font-size: 12px; }
+.step.running .step-dot { border-color: var(--accent); }
+.step.done .step-dot { background: var(--success); border-color: var(--success); color: #fff; }
+.step.error .step-dot { background: var(--danger); border-color: var(--danger); color: #fff; }
+.step-name { flex: 1; }
+.step-status { font-size: 12px; color: var(--text-dim); }
