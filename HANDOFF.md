@@ -1,36 +1,39 @@
 # HANDOFF.md
 
-## Phiên hiện tại: Account 02 (làm Phase 2) → bàn giao cho Account 03
+## Phiên hiện tại: Account 02 (Phase 2 + Phase 3) → bàn giao cho Account 03
 Vòng quay: 01 → 02 → … → 10 → 01. Ghi rõ số tài khoản đầu mỗi lần cập nhật file này.
 
 ## Trạng thái tổng
-- **Phase 0 – Foundation: HOÀN THÀNH** (Account 01).
-- **Phase 1 – IPA Reader: HOÀN THÀNH** (Account 01).
-- **Phase 2 – Engine Detection: HOÀN THÀNH** (Account 02). Nhận diện 12 engine + Native iOS + Unknown, có bằng chứng/magic bytes/độ tin cậy; hiển thị ở Dashboard và view Engine; dữ liệu engine.json + phần engine của report.json nằm trong session (đóng gói file là Phase 9).
-- Phase 3 trở đi: chưa bắt đầu, không có code dang dở.
+- Phase 0 Foundation, Phase 1 IPA Reader (Account 01): hoàn thành.
+- Phase 2 Engine Detection (Account 02): hoàn thành; chi tiết rule trong INTERFACES.md.
+- **Phase 3 File Scanner (Account 02): hoàn thành phần code + test giả lập.** Quét toàn bộ entry, magic bytes, SHA-1/SHA-256 (tự cài, đối chiếu hashlib/crypto), CRC32, manifest.csv, File Explorer, ghi nhận header archive (không giải nén).
+- Phase 4 trở đi: chưa bắt đầu, không có code dang dở.
 
-## File đã tạo/sửa trong Phase 2
-Tạo: js/modules/detect_engine.js, tests/make_fake_ipas.py, tests/run_detect_tests.js.
-Sửa: js/ipa_reader.js (bước engine cuối analyze, IpaResult.engine/engineProbes), js/workers/ipa.worker.js (importScripts), index.html (script, #view-engine, phase-note), js/ui.js (renderEngine, stat engine, VIEWS.engine bỏ empty), js/events.js (applyResult/startAnalysis), js/app.js (VERSION 0.3.0-phase2), README.md, INTERFACES.md, HANDOFF.md, NEXT_TASK.md.
+## File đã tạo/sửa trong phiên này
+Tạo: js/modules/{detect_engine,hash,magic_bytes,archive_scanner,file_scanner}.js, tests/{make_fake_ipas.py,run_detect_tests.js,make_scan_ipa.py,run_scan_tests.js}.
+Sửa: js/ipa_reader.js (bước engine + scan, streamEntry), js/workers/ipa.worker.js, index.html (script, #view-engine, #view-explorer, #hash-mode), js/ui.js (renderEngine, renderExplorer), js/events.js, js/app.js (VERSION 0.4.0-phase3), css/analyzer.css, README.md, INTERFACES.md, HANDOFF.md, NEXT_TASK.md.
 
-## Kiểm thử đã chạy (Phase 2)
-- `python3 tests/make_fake_ipas.py /tmp/fake_ipas && node tests/run_detect_tests.js /tmp/fake_ipas` (Node ≥ 20): 22 IPA giả lập, **359 kiểm tra đạt**. Gồm Unity IL2CPP (đọc được version 2021.3.16f1 từ header UnityFS), Unity Mono, Unity xung đột IL2CPP+Mono (variant=null), Unity không rõ biến thể, Unity chỉ 1 dấu hiệu yếu (→ Unknown), metadata sai magic (→ probable + ghi chú), Unreal, Flutter, React Native+Hermes, Godot (version 4.2.1 từ GDPC), Godot chỉ có .pck không magic (→ possible, không confirmed), Native iOS, Native chỉ Assets.car (→ Unknown), Unknown, Cocos Creator, GameMaker, Defold, Solar2D, Ren'Py, RPG Maker MV và MZ, Flutter+Unity (có alternatives).
-- Chromium headless qua http (có Worker): 3 IPA giả lập (Unity IL2CPP, Unknown, React Native) → dashboard + view Engine đúng; không lỗi JS; không request ra ngoài.
-**Chưa kiểm thử:** IPA thật (mọi engine), Safari iPhone thật, chế độ fallback file:// sau Phase 2, IPA >1 GB, ZIP64 thật. Dữ liệu giả lập do chính mình tạo nên chỉ chứng minh logic, KHÔNG chứng minh độ chính xác trên IPA thật – cần người dùng thử IPA thật và gửi log.
+## Kiểm thử đã chạy
+- `node tests/run_detect_tests.js /tmp/fake_ipas` (sau `python3 tests/make_fake_ipas.py /tmp/fake_ipas`): 22 IPA, 359 kiểm tra đạt.
+- `python3 tests/make_scan_ipa.py /tmp/fake_ipas && node tests/run_scan_tests.js /tmp/fake_ipas`: 92 kiểm tra đạt: SHA-1/SHA-256 khớp hashlib (kể cả file 70 MB chỉ SHA-1), CRC, phân loại ~12 loại, đuôi≠nội dung, file rỗng, đường dẫn `../` bị từ chối, CSV (BOM, escape, chống formula injection), fast/standard/auto, hủy giữa chừng.
+- Hash: 15 độ dài × 2 thuật toán, chia chunk bất kỳ, khớp `crypto` của Node; CRC32 vector chuẩn.
+- Chromium headless qua http (có Worker) với IPA giả lập: dashboard (Unity · confirmed, 15 file), Explorer, lọc, tải được `manifest.csv` đúng header; không lỗi JS, không request ngoài. (Số dòng CSV trong trình duyệt chưa đếm lại; số dòng đã kiểm trong test Node.)
+**Chưa kiểm thử:** IPA thật (mọi engine), tốc độ băm trên iPhone/Safari thật với IPA 1.2 GB, bộ nhớ khi ~100k+ file, ZIP64 thật, chế độ file://. Dữ liệu giả lập do chính Account 02 tạo nên chỉ chứng minh logic, không chứng minh độ chính xác trên IPA thật.
 
 ## Quyết định kiến trúc (không đổi khi bàn giao)
-- Như Phase 0/1: script thường + `window.IPAStudio`, CSP chặt, không thư viện ngoài, dữ liệu IPA chỉ vào UI qua textContent, `session.results.ipa` là nguồn cho Phase 3+.
-- Phase 2: `detect()` đồng bộ thuần dữ liệu; magic bytes đọc riêng bằng `runProbes` (cần `zipEntries` gốc vì `ipaResult.entries` không có offset). Bảng dấu hiệu nằm trong mảng `ENGINES` đầu detect_engine.js: thêm engine/dấu hiệu bằng cách thêm phần tử, không sửa logic.
-- `analysis_branch` = nhánh engine chỉ khi confirmed/probable; còn lại `generic`.
+- Như Phase 0/1/2. `session.results.ipa` + `.engine` + `.manifest` là nguồn cho Phase 4+.
+- Băm bằng JS tự cài (crypto.subtle không băm theo luồng được). Chế độ `auto/fast/standard` để IPA lớn trên điện thoại không bị treo; `fast` KHÔNG băm (cột sha1/sha256 rỗng, status head_only) – đừng coi là lỗi.
+- Archive lồng nhau, PAK, UnityFS: chỉ ghi header (`archive_status=recognized_not_unpacked|unsupported|encrypted`), tuyệt đối không giải nén/thử khóa khi chưa có parser kiểm chứng.
+- `engine_related` = 'unknown' khi engine chưa confirmed/probable; không giả định.
 
 ## Hạn chế / lỗi còn tồn tại
-- Chưa quét chuỗi/symbol trong binary Mach-O (Unity/UE/Godot/GameMaker trong binary chính không phát hiện được nếu tên file bị đổi/đóng gói lại); nếu binary mã hóa FairPlay thì có ghi chú.
-- Unreal: footer `.pak` (magic 0x5A6F12E1) chưa đọc; chỉ dựa tên/đường dẫn.
-- Ngưỡng/trọng số (TIER, MIN_CONFIDENCE) là lựa chọn thiết kế, chưa hiệu chỉnh bằng IPA thật. Dấu hiệu `game.ios` (GameMaker), `.lu` (Corona), `Data/Raw` (Unity), `cookeddata/` (Unreal iOS) dựa trên hiểu biết chung, chưa kiểm chứng.
-- Tồn đọng từ Phase 1: `stats.totalFiles` đếm cả entry unsafe; chỉ phân tích `Payload/*.app` cấp 1; Hủy ở chế độ fallback luồng chính chỉ dừng ở điểm kiểm tra; chưa có extractor.log đóng gói (Phase 9).
+- Đã nêu ở Phase 2: chưa quét chuỗi/symbol trong Mach-O; Unreal PAK footer chưa đọc; ngưỡng/trọng số chưa hiệu chỉnh bằng IPA thật.
+- Phase 3: phân loại dựa 4 KB đầu; `zlib` chỉ nhận qua 2 byte đầu (độ chắc thấp, đã ghi rõ trong format); `.bundle` là file hay thư mục chưa phân biệt ngoài việc chỉ xét file; engine game không có trong danh sách 12 (vd Dead Cells dùng Haxe/Heaps) sẽ ra Unknown/Native – đúng thiết kế, cần log IPA thật để thêm dấu hiệu.
+- Hiệu năng: standard đọc toàn bộ IPA một lượt; với IPA >512 MB `auto` chọn fast. Manifest nằm hết trong RAM và được postMessage (structured clone) – chưa đo với hàng trăm nghìn file.
+- Tồn đọng từ Phase 1: chỉ phân tích `Payload/*.app` cấp 1; Hủy ở chế độ fallback luồng chính chỉ dừng ở điểm kiểm tra; chưa có extractor.log đóng gói (Phase 9).
 
 ## Git
-- Commit cục bộ trong thư mục dự án (xem `git log`). **Chưa push**: phiên không có kết nối GitHub. Người dùng tự đẩy lên repo `Ipa-localization` (hoặc tải zip bàn giao).
+- Commit cục bộ trong phiên Account 02 (xem `git log` nếu zip có .git; zip gửi lên GitHub cố ý KHÔNG kèm .git vì làm workflow giải nén lỗi Permission denied). **Chưa push** từ phiên này. Workflow `.github/workflows/unzip.yml` đã được sửa để bỏ qua `.git` trong zip.
 
 ## Việc tiếp theo
-`NEXT_TASK.md` (Phase 3 – File Scanner). Theo mục 28 prompt gốc: người dùng gửi log/kết quả Phase 2 trước, rồi mới sang Phase 3.
+`NEXT_TASK.md`. Theo mục 28 prompt gốc: người dùng gửi log/kết quả Phase 2–3 trên IPA thật trước; nếu có sai lệch thì sửa Phase 2–3 trước khi sang Phase 4.

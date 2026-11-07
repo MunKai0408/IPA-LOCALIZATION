@@ -7,7 +7,7 @@
     overview:     { title: 'Tổng quan',      icon: '▦' },
     analyze:      { title: 'Phân tích IPA',  icon: '⬆' },
     engine:       { title: 'Engine',         icon: '⚙', phase: 2 },
-    explorer:     { title: 'File Explorer',  icon: '🗂', phase: 3, empty: 'Chưa có danh sách file. Cây thư mục, magic bytes và manifest sẽ hiện ở đây sau khi quét.' },
+    explorer:     { title: 'File Explorer',  icon: '🗂', phase: 3 },
     fonts:        { title: 'Font',           icon: 'Aa', phase: 5, empty: 'Chưa có dữ liệu font. Độ phủ tiếng Việt sẽ được kiểm tra trên font thực sự đọc được.' },
     text:         { title: 'Văn bản',        icon: '✎', phase: 6, empty: 'Chưa có chuỗi nào được trích xuất.' },
     localization: { title: 'Localization',   icon: '🌐', phase: 6, empty: 'Chưa có bảng ngôn ngữ nào được nhận diện.' },
@@ -170,6 +170,7 @@
     renderError(s);
     renderDetails(s);
     renderEngine(s);
+    renderExplorer(s);
   }
 
   /* ---------- Lỗi + chi tiết ứng dụng ---------- */
@@ -284,6 +285,59 @@
       listBlock('Ghi chú', res.notes),
       listBlock('Engine khác có dấu hiệu', res.alternatives.map(function (a) { return a.engine + ' – ' + a.status + ' (' + Math.round(a.confidence * 100) + '%)'; }))
     ]));
+  }
+
+  /* ---------- View File Explorer (Phase 3) ---------- */
+  const EX = { manifest: null, filtered: [], page: 0, size: 100, bound: false };
+  function exFilter() {
+    const m = EX.manifest; if (!m) return;
+    const q = $('#ex-search').value.trim().toLowerCase(), t = $('#ex-type').value, pr = $('#ex-priority').checked;
+    EX.filtered = m.rows.filter(function (r) {
+      return (!t || r.detected_type === t) && (!pr || r.priority) && (!q || r.relative_path.toLowerCase().indexOf(q) >= 0);
+    });
+    EX.page = 0; exPage();
+  }
+  function exPage() {
+    const tbl = $('#ex-table'), total = EX.filtered.length, from = EX.page * EX.size, to = Math.min(total, from + EX.size);
+    tbl.replaceChildren();
+    const head = h('tr', {}, ['Đường dẫn', 'Kích thước', 'Loại', 'Định dạng', 'Magic', 'SHA-1', 'Engine', 'Trạng thái'].map(function (t) { return h('th', { text: t }); }));
+    tbl.appendChild(h('thead', {}, [head]));
+    tbl.appendChild(h('tbody', {}, EX.filtered.slice(from, to).map(function (r) {
+      return h('tr', {}, [
+        h('td', { class: 'path', text: r.relative_path }), h('td', { text: formatBytes(r.file_size) }), h('td', { text: r.detected_type }),
+        h('td', { text: r.detected_format, title: r.error || '' }), h('td', { text: r.magic_bytes }), h('td', { text: r.sha1 ? r.sha1.slice(0, 12) + '…' : '—', title: r.sha1 }),
+        h('td', { text: r.engine_related }), h('td', { text: r.extraction_status })
+      ]);
+    })));
+    $('#ex-count').textContent = total ? 'Hiển thị ' + (from + 1) + '–' + to + ' / ' + total + ' file' : 'Không có file khớp bộ lọc';
+    $('#ex-prev').disabled = EX.page === 0; $('#ex-next').disabled = to >= total;
+  }
+  function renderExplorer(s) {
+    const m = (s.results && s.results.manifest) || null;
+    if (m === EX.manifest) return;
+    EX.manifest = m;
+    const box = $('#explorer-detail'), empty = $('#explorer-empty');
+    if (!box || !empty) return;
+    box.hidden = !m; empty.hidden = !!m;
+    if (!m) return;
+    const sm = m.summary, sum = $('#explorer-summary');
+    sum.replaceChildren(h('h2', { class: 'section-title', text: 'Tóm tắt quét' }));
+    const dl = h('dl', { class: 'kv' });
+    kvRow(dl, 'Tổng số file', String(sm.totalFiles)); kvRow(dl, 'Tổng dung lượng giải nén', formatBytes(sm.totalBytes));
+    kvRow(dl, 'Chế độ', m.options.hashMode === 'standard' ? 'Đầy đủ (SHA-1 ' + sm.hashed + ' file, SHA-256 ' + sm.sha256Hashed + ' file)' : 'Nhanh (chưa băm)');
+    kvRow(dl, 'File ưu tiên', String(sm.priorityFiles)); kvRow(dl, 'Đuôi ≠ nội dung', String(sm.mismatches));
+    kvRow(dl, 'File nén/đóng gói (chỉ ghi nhận header)', String(sm.archives)); kvRow(dl, 'File lỗi/không đọc được', String(sm.errors));
+    sum.appendChild(dl);
+    sum.appendChild(h('div', { class: 'chips' }, Object.keys(sm.byType).sort().map(function (k) { return h('span', { class: 'badge', text: k + ': ' + sm.byType[k] }); })));
+    const sel = $('#ex-type'); sel.replaceChildren(h('option', { value: '', text: 'Mọi loại' }));
+    Object.keys(sm.byType).sort().forEach(function (k) { sel.appendChild(h('option', { value: k, text: k + ' (' + sm.byType[k] + ')' })); });
+    if (!EX.bound) {
+      EX.bound = true;
+      $('#ex-search').addEventListener('input', exFilter); sel.addEventListener('change', exFilter); $('#ex-priority').addEventListener('change', exFilter);
+      $('#ex-prev').addEventListener('click', function () { if (EX.page > 0) { EX.page--; exPage(); } });
+      $('#ex-next').addEventListener('click', function () { if ((EX.page + 1) * EX.size < EX.filtered.length) { EX.page++; exPage(); } });
+    }
+    exFilter();
   }
 
   /* ---------- Log viewer ---------- */

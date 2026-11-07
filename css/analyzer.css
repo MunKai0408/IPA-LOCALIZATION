@@ -11,3 +11,11 @@
 .banner-error { border-color: var(--danger); color: var(--danger); font-weight: 600; overflow-wrap: anywhere; }
 .select { min-height: 44px; padding: 0 var(--space-3); background: var(--bg-elev-2); border: 1px solid var(--border); border-radius: var(--radius-sm); width: 100%; }
 @media (max-width: 520px) { .kv { grid-template-columns: 1fr; gap: 0; } .kv dt { margin-top: var(--space-2); } }
+
+/* Phase 3: File Explorer */
+.table-wrap { overflow-x: auto; margin-top: var(--space-2); }
+.tbl { width: 100%; border-collapse: collapse; font-size: 12px; font-family: var(--font-mono); }
+.tbl th, .tbl td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
+.tbl td.path { white-space: normal; overflow-wrap: anywhere; min-width: 200px; }
+.check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--space-2); }

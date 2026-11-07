@@ -71,9 +71,17 @@
           </div>
           <dl class="file-info" id="file-info"></dl>
           <p class="mt-2"><span class="badge" id="file-check" hidden></span></p>
-          <p class="card mt-3" id="phase-note" hidden>ℹ️ Phase 2 hoàn tất: đã đọc cấu trúc IPA, Info.plist và nhận diện engine (xem mục “Engine”). Quét file, font và chuỗi sẽ có ở các phase sau, nên các bước đó vẫn ở trạng thái “Chờ”.</p>
+          <p class="card mt-3" id="phase-note" hidden>ℹ️ Phase 3 hoàn tất: đã đọc cấu trúc IPA, nhận diện engine và quét danh sách file (xem mục “Engine” và “File Explorer”). Trích xuất font/chuỗi và các bước sau sẽ có ở phase sau nên vẫn ở trạng thái “Chờ”.</p>
           <div class="card banner-error mt-3" id="error-banner" role="alert" hidden></div>
           <div class="card mt-3" id="bundle-picker" hidden></div>
+          <div class="field mt-3" id="hash-field">
+            <label for="hash-mode">Chế độ quét file</label>
+            <select class="select" id="hash-mode">
+              <option value="auto" selected>Tự động (IPA ≤ 512 MB: băm SHA; lớn hơn: nhanh)</option>
+              <option value="standard">Đầy đủ: SHA-1 mọi file, SHA-256 file ≤ 64 MB (chậm với IPA lớn)</option>
+              <option value="fast">Nhanh: chỉ đọc đầu file để phân loại, không băm</option>
+            </select>
+          </div>
           <div class="toolbar mt-3">
             <button class="btn btn-primary" id="btn-start" type="button" disabled>Bắt đầu phân tích</button>
             <button class="btn" id="btn-cancel" type="button" disabled>Hủy tác vụ</button>
@@ -111,6 +119,29 @@
         <div id="engine-detail" hidden></div>
       </section>
 
+      <!-- FILE EXPLORER (Phase 3) -->
+      <section class="view" id="view-explorer" hidden>
+        <div class="card empty" id="explorer-empty">
+          <div class="empty-icon" aria-hidden="true">🗂</div>
+          <h2>File Explorer</h2>
+          <p>Chưa có danh sách file. Tải IPA ở mục “Phân tích IPA” rồi bấm Bắt đầu phân tích.</p>
+        </div>
+        <div id="explorer-detail" hidden>
+          <div class="card" id="explorer-summary"></div>
+          <div class="card mt-3">
+            <div class="toolbar">
+              <input class="select" id="ex-search" type="search" placeholder="Tìm theo đường dẫn…" autocomplete="off">
+              <select class="select" id="ex-type"><option value="">Mọi loại</option></select>
+              <label class="check"><input type="checkbox" id="ex-priority"> Chỉ file ưu tiên</label>
+              <button class="btn" id="btn-manifest" type="button">Tải manifest.csv</button>
+            </div>
+            <p class="dim mt-2" id="ex-count"></p>
+            <div class="table-wrap"><table class="tbl" id="ex-table"></table></div>
+            <div class="toolbar mt-2"><button class="btn" id="ex-prev" type="button">‹ Trước</button><span class="spacer"></span><button class="btn" id="ex-next" type="button">Sau ›</button></div>
+          </div>
+        </div>
+      </section>
+
       <!-- Các view chưa triển khai (ui.js sinh ra) -->
       <div id="generic-views"></div>
 
@@ -135,7 +166,11 @@
 <script src="js/modules/logger.js"></script>
 <script src="js/plist_parser.js"></script>
 <script src="js/binary_reader.js"></script>
+<script src="js/modules/hash.js"></script>
+<script src="js/modules/magic_bytes.js"></script>
+<script src="js/modules/archive_scanner.js"></script>
 <script src="js/modules/detect_engine.js"></script>
+<script src="js/modules/file_scanner.js"></script>
 <script src="js/ipa_reader.js"></script>
 <script src="js/worker_manager.js"></script>
 <script src="js/state.js"></script>

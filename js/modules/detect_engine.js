@@ -414,11 +414,33 @@
     return out;
   }
 
+  /** Một file (đường dẫn tương đối .app) có thuộc dấu hiệu của engine đã nhận diện không?
+      true/false khi engine confirmed/probable; null khi chưa đủ bằng chứng. */
+  function makeRelatedFn(engineResult) {
+    if (!engineResult || (engineResult.status !== 'confirmed' && engineResult.status !== 'probable')) return function () { return null; };
+    const def = ENGINES.find(function (d) { return d.name === engineResult.engine; });
+    if (!def || def.native) return function () { return null; };
+    const res = def.indicators.filter(function (i) { return i.re && !i.abs; }).map(function (i) { return i.re; });
+    const fws = def.indicators.filter(function (i) { return i.fw; }).map(function (i) { return i.fw; });
+    return function (rel) {
+      const l = rel.toLowerCase();
+      const m = /^frameworks\/([^\/]+)\//.exec(l);
+      if (m && fws.some(function (re) { return re.test(m[1]); })) return true;
+      let acc = '';
+      const parts = l.split('/');
+      for (let i = 0; i < parts.length; i++) {
+        acc += parts[i] + (i < parts.length - 1 ? '/' : '');
+        for (let k = 0; k < res.length; k++) if (res[k].test(acc)) return true;
+      }
+      return false;
+    };
+  }
+
   /** Phần engine của report.json (Phase 9 sẽ gộp vào file). */
   function toReportFields(res) {
     return { engine: res.engine, engine_variant: res.variant, engine_confidence: res.confidence, engine_status: res.status };
   }
 
   NS.DetectEngine = { TIER: TIER, MIN_CONFIDENCE: MIN_CONFIDENCE, ENGINE_NAMES: ENGINES.map(function (e) { return e.name; }),
-                      detect: detect, planProbes: planProbes, runProbes: runProbes, toReportFields: toReportFields };
+                      detect: detect, makeRelatedFn: makeRelatedFn, planProbes: planProbes, runProbes: runProbes, toReportFields: toReportFields };
 })(typeof window !== 'undefined' ? window : self);

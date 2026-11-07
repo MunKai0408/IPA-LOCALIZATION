@@ -1,4 +1,4 @@
-# INTERFACES.md – API hiện tại (Phase 0 → 2)
+# INTERFACES.md – API hiện tại (Phase 0 → 3)
 
 Namespace: `window.IPAStudio` (gọi tắt NS). Chỉ liệt kê cái ĐÃ tồn tại. Cập nhật file này mỗi khi thêm/sửa chữ ký.
 
@@ -61,7 +61,7 @@ Events.bind()                  // gắn mọi listener DOM, gọi 1 lần ở bo
 Events.selectFile(file)        // reset session, kiểm tra đuôi .ipa, set status
 ```
 
-## NS.VERSION (js/app.js) = '0.3.0-phase2'
+## NS.VERSION (js/app.js) = '0.4.0-phase3'
 
 ## DOM id quan trọng
 #btn-start, #btn-cancel, #btn-clear, #btn-pick, #file-input, #dropzone, #file-info, #file-check, #progress-bar, #steps, #log-viewer, #stat-grid, #generic-views, #toasts.
@@ -161,3 +161,35 @@ Quy tắc đã cài: confidence = noisy-or các weight; `confirmed` cần ≥1 s
 
 ## Chưa tồn tại (đừng gọi)
 Hash, Manifest, Report, Export và mọi module quét/dump/phân tích khác (Phase 3+).
+
+---
+# Bổ sung Phase 3 (Account 02)
+
+## Module mới (đều bọc `root`, chạy được ở Worker và luồng chính)
+```
+NS.Hash.create('sha1'|'sha256'|'crc32') -> { update(Uint8Array), hex(), value?() }     // băm tăng dần, đã đối chiếu crypto của Node
+NS.MagicBytes.identify(head:Uint8Array, name:string, relPath?:string) -> { type, format, source:'magic'|'content'|'extension'|'none', magic:'HEX HEX…', extMismatch:boolean, note:string, priority:boolean }
+   type ∈ Text|Font|Image|Audio|Video|Archive|Binary|Executable|Database|Unity asset|Unreal asset|Localization|Unknown
+NS.MagicBytes.extOf(name), .hexOf(bytes,n), .PRIORITY_EXT:Set, .TYPES:string[]
+NS.ArchiveScanner.describe(head, format, size) -> { status:'recognized_not_unpacked'|'encrypted'|'unsupported', info:object, note }   // CHỈ đọc header, KHÔNG giải nén
+NS.ArchiveScanner.isArchiveLike(det) -> boolean
+NS.FileScanner.scan(file, ipaResult, zipEntries, {hashMode:'auto'|'fast'|'standard'}, hooks:{step?,log?,isCancelled?}) -> Promise<Manifest>
+NS.FileScanner.toCsv(manifest) -> string (BOM UTF-8, CRLF, chống formula injection bằng dấu ' đầu ô nếu bắt đầu bằng = + - @ tab CR)
+NS.FileScanner.COLUMNS, HEAD_BYTES=4096, SHA256_MAX_BYTES=64MiB, resolveMode(mode, ipaSize)
+NS.DetectEngine.makeRelatedFn(engineResult) -> (relPath)=>true|false|null   // null khi engine chưa confirmed/probable hoặc Native
+NS.IpaReader.streamEntry(file, entry, onChunk(Uint8Array), {isCancelled?}) -> Promise<{bytes}>   // đọc luồng, kiểm tra size khai báo; entry = ENTRY GỐC của openZip
+```
+Manifest = { columns:string[], rows:Row[], summary, options:{hashMode,requested,headBytes,sha256MaxBytes}, generatedAt:ISO }
+Row (cột manifest.csv, theo thứ tự): relative_path (tương đối .app; ngoài Payload thì đường dẫn đầy đủ), file_name, extension, file_size, compressed_size, sha1, sha256, magic_bytes, detected_type, detected_format, type_source, ext_mismatch, engine_related ('yes'|'no'|'unknown'), priority, area, extraction_status, archive_status, archive_info (JSON), error.
+extraction_status ∈ ok | head_only (chế độ fast) | crc_mismatch | read_error | unsafe_path | symlink_not_followed | encrypted_zip | unsupported_method.
+summary = { totalFiles, totalBytes, byType{}, byStatus{}, byArea{}, hashed, sha256Hashed, priorityFiles, mismatches, archives, errors }.
+Chế độ: `standard` = đọc đầy đủ, SHA-1 mọi file, SHA-256 chỉ file ≤ 64 MiB, kiểm CRC32 với ZIP; `fast` = chỉ đọc 4 KB đầu để phân loại, KHÔNG băm; `auto` = standard nếu IPA ≤ 512 MiB, ngược lại fast.
+
+## Thay đổi ở module cũ
+- `IpaReader.analyze(file, opts{bundle?,hashMode?}, hooks)`: sau bước engine có bước `scan`; IpaResult có thêm `manifest: Manifest|null`. Lỗi quét chỉ thành warning + step scan `error`.
+- Worker importScripts: plist_parser, binary_reader, hash, magic_bytes, archive_scanner, detect_engine, file_scanner, ipa_reader. `index.html` nạp cùng thứ tự (trước ipa_reader).
+- `Events.applyResult`: `session.manifest = {summary, options, generatedAt}`; `session.results.manifest = Manifest` (đủ hàng); `stats.totalFiles` = số file đã quét. `startAnalysis` đọc `#hash-mode`.
+- UI: view `explorer` thật (tóm tắt, lọc loại/tìm đường dẫn/chỉ file ưu tiên, phân trang 100 hàng, nút `#btn-manifest` tải manifest.csv). `index.html` thêm `#hash-mode`, `#view-explorer`.
+
+## Chưa tồn tại (đừng gọi)
+Giải nén archive lồng nhau, phân tích metadata IL2CPP (Phase 4), font (5), chuỗi/localization (6), runtime import (7), template (8), Packager/Report/Export (9), engine khác (10).

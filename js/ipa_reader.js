@@ -152,6 +152,46 @@
     return { data: out, truncated: truncated };
   }
 
+  /* ---------- Đọc luồng 1 entry (không nạp cả file vào RAM) ---------- */
+  /** Gọi onChunk(Uint8Array) lần lượt; ném lỗi nếu dữ liệu vượt/thiếu so với size khai báo. @returns {Promise<{bytes:number}>} */
+  async function streamEntry(file, entry, onChunk, opt) {
+    opt = opt || {};
+    if (entry.unsafe) throw new IpaError('UNSAFE_PATH', 'Từ chối đọc đường dẫn không an toàn: ' + entry.unsafe);
+    if (entry.encrypted) throw new IpaError('ENCRYPTED_ENTRY', 'Entry bị mã hóa ZIP, không đọc: ' + entry.name);
+    if (entry.method !== 0 && entry.method !== 8) throw new IpaError('UNSUPPORTED_METHOD', 'Phương thức nén ' + entry.method + ' chưa hỗ trợ: ' + entry.name);
+    const cancelled = opt.isCancelled || function () { return false; };
+    const hdr = new DataView(await file.slice(entry.offset, entry.offset + 30).arrayBuffer());
+    if (hdr.byteLength < 30 || hdr.getUint32(0, true) !== 0x04034b50) throw new IpaError('BAD_LOCAL_HEADER', 'Local header hỏng: ' + entry.name);
+    const start = entry.offset + 30 + hdr.getUint16(26, true) + hdr.getUint16(28, true);
+    let total = 0;
+    if (entry.method === 0) {
+      const STEP = 4 * 1024 * 1024;
+      for (let o = 0; o < entry.csize; o += STEP) {
+        if (cancelled()) throw new IpaError('CANCELLED', 'Đã hủy');
+        const part = new Uint8Array(await file.slice(start + o, start + Math.min(o + STEP, entry.csize)).arrayBuffer());
+        total += part.length; onChunk(part);
+      }
+    } else {
+      if (typeof DecompressionStream === 'undefined') throw new IpaError('NO_DECOMPRESSION', 'Trình duyệt thiếu DecompressionStream');
+      const reader = file.slice(start, start + entry.csize).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader();
+      try {
+        for (;;) {
+          if (cancelled()) { await reader.cancel(); throw new IpaError('CANCELLED', 'Đã hủy'); }
+          const r = await reader.read();
+          if (r.done) break;
+          total += r.value.length;
+          if (total > entry.size) { await reader.cancel(); throw new IpaError('SIZE_MISMATCH', 'Dữ liệu giải nén vượt kích thước khai báo: ' + entry.name); }
+          onChunk(r.value);
+        }
+      } catch (e) {
+        if (e instanceof IpaError) throw e;
+        throw new IpaError('INFLATE_FAILED', 'Giải nén thất bại (' + entry.name + '): ' + (e && e.message ? e.message : e));
+      }
+    }
+    if (total !== entry.size) throw new IpaError('SIZE_MISMATCH', 'Kích thước thực ' + total + ' ≠ khai báo ' + entry.size + ': ' + entry.name);
+    return { bytes: total };
+  }
+
   /* ---------- Phân tích ---------- */
   function deviceFamilyNames(arr) {
     if (!Array.isArray(arr)) return [];
@@ -334,7 +374,7 @@
       hasScInfo: scInfo,
       entries: entries.map(function (e) { return { path: e.name, size: e.size, csize: e.csize, method: e.method, dir: e.dir, unsafe: e.unsafe, encrypted: e.encrypted }; }),
       warnings: warnings, errors: errors,
-      engine: null, engineProbes: []
+      engine: null, engineProbes: [], manifest: null
     };
 
     /* --- Bước 3: nhận diện engine (Phase 2). Lỗi ở đây không làm hỏng kết quả Phase 1. --- */
@@ -354,9 +394,26 @@
       warn('Nhận diện engine thất bại: ' + ((e && e.message) || e));
       step('engine', 'error', (e && e.message) || 'Lỗi');
     }
+    progress(0.9);
+
+    /* --- Bước 4: quét toàn bộ file (Phase 3). Lỗi ở đây chỉ thành cảnh báo, không làm mất kết quả Phase 1–2. --- */
+    step('scan', 'running', 'Quét file');
+    try {
+      if (!NS.FileScanner) throw new IpaError('NO_SCAN_MODULE', 'Thiếu module file_scanner.js');
+      const mf = await NS.FileScanner.scan(file, result, entries, { hashMode: opts.hashMode || 'auto' }, { step: step, log: log, isCancelled: cancelled });
+      result.manifest = mf;
+      const sm = mf.summary;
+      log('SUCCESS', 'Quét file xong: ' + sm.totalFiles + ' file, ' + sm.hashed + ' file đã băm (chế độ ' + mf.options.hashMode + ')',
+          { errors: sm.errors, archives: sm.archives, priority: sm.priorityFiles, mismatches: sm.mismatches });
+      step('scan', 'done', sm.totalFiles + ' file · ' + (mf.options.hashMode === 'standard' ? 'đã băm SHA' : 'chưa băm (nhanh)'));
+    } catch (e) {
+      if (e && e.code === 'CANCELLED') throw e;
+      warn('Quét file thất bại: ' + ((e && e.message) || e));
+      step('scan', 'error', (e && e.message) || 'Lỗi');
+    }
     progress(1);
     return result;
   }
 
-  NS.IpaReader = { LIMITS: LIMITS, IpaError: IpaError, openZip: openZip, readEntry: readEntry, analyze: analyze };
+  NS.IpaReader = { LIMITS: LIMITS, IpaError: IpaError, openZip: openZip, readEntry: readEntry, streamEntry: streamEntry, analyze: analyze };
 })(typeof window !== 'undefined' ? window : self);
