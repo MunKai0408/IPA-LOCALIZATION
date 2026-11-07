@@ -2,7 +2,7 @@
 
 Website phân tích **tĩnh** file IPA game iOS ngay trong trình duyệt để phục vụ Việt hóa. Không backend, không upload dữ liệu.
 
-> Trạng thái: **Phase 1 – IPA Reader hoàn thành** (đọc ZIP, Info.plist XML/binary, kiến trúc Mach-O, cờ mã hóa FairPlay). Engine, file scanner, font, chuỗi… ở các phase sau.
+> Trạng thái: **Phase 4 – sub-phase 4.1 (Unity Component Discovery) hoàn thành**, trên nền Phase 0–3 (đọc IPA, Info.plist, Mach-O/FairPlay, nhận diện engine, quét file + manifest). Header/phiên bản metadata (4.2), trích xuất metadata (4.3), font, chuỗi… ở các bước sau.
 
 ## Chạy thử
 
@@ -10,6 +10,15 @@ Không cần cài đặt hay build. Code dùng script thường (không ES modul
 
 - **Máy tính:** mở `index.html` bằng trình duyệt, hoặc chạy `python3 -m http.server 8000` rồi vào `http://localhost:8000`.
 - **GitHub Pages (khuyên dùng khi dùng iPhone):** repo → Settings → Pages → Source: *Deploy from a branch* → Branch `main`, thư mục `/ (root)` → Save. Sau 1–2 phút mở `https://<user>.github.io/<repo>/`.
+
+## Kiểm tra Phase 4.1 (Unity Component Discovery)
+
+1. Phân tích một IPA game Unity → bước **Unity IL2CPP (thành phần)** Xong (vd “IL2CPP · metadata selected”). IPA không phải Unity → bước “Bỏ qua”.
+2. Mục **Unity / Metadata**: kết luận (đã tìm thấy / chưa đủ bằng chứng / không phải Unity), biến thể runtime (IL2CPP, Mono, xung đột, chưa xác định), phiên bản Unity (chỉ khi đọc được từ header UnityFS), danh sách thành phần đã thấy (UnityFramework, global-metadata.dat, Data/Managed/Metadata, Data/Resources, StreamingAssets, Data/Raw, *.assets, *.resource, *.resS, *.bundle, globalgamemanagers, sharedassets*, level*…) và nhóm không thấy, file `global-metadata.dat` đầu vào (đã chọn / thiếu / nhiều ứng viên / không đọc được).
+3. “Không tìm thấy libil2cpp” là bình thường trên iOS (thường nằm trong binary). “Xung đột” hoặc “Chưa xác định” là kết quả trung thực, không phải lỗi: công cụ không đoán.
+4. Bước này **chưa đọc nội dung** metadata. Nếu magic bytes của file không khớp chữ ký IL2CPP, UI nói “có thể bị mã hóa/obfuscate” và không đi tiếp. Header/phiên bản sẽ kiểm ở 4.2.
+5. Nút **Tải unity_info.json** tải kết quả (schema `unity_info/1`) để gửi lại cho người phát triển.
+6. Kiểm thử tự động (Node ≥ 20, Python 3), toàn bộ trên IPA giả lập: `python3 tests/make_fake_ipas.py /tmp/fake_ipas && python3 tests/make_scan_ipa.py /tmp/fake_ipas && python3 tests/make_unity_ipas.py /tmp/fake_ipas && node tests/run_unity_tests.js /tmp/fake_ipas`. Lưu ý: giả lập chỉ chứng minh logic, không chứng minh độ chính xác trên IPA thật.
 
 ## Kiểm tra Phase 3
 
@@ -52,7 +61,7 @@ Lưu ý: nếu IPA tải từ App Store còn mã hóa FairPlay (cryptid≠0), c�
 
 ## Kiến trúc
 
-Namespace toàn cục `window.IPAStudio`. Thứ tự nạp script: `logger → plist_parser → binary_reader → hash → magic_bytes → archive_scanner → detect_engine → file_scanner → ipa_reader → worker_manager → state → ui → events → app`. Phân tích IPA chạy trong `js/workers/ipa.worker.js`; nếu Worker không có (vd mở bằng `file://`) thì tự chạy trên luồng chính và ghi cảnh báo. Chi tiết API: `INTERFACES.md`. Tiến độ: `HANDOFF.md`. Việc tiếp theo: `NEXT_TASK.md`.
+Namespace toàn cục `window.IPAStudio`. Thứ tự nạp script: `logger → plist_parser → binary_reader → hash → magic_bytes → archive_scanner → detect_engine → file_scanner → unity_dump → ipa_reader → worker_manager → state → ui → events → app`. Phân tích IPA chạy trong `js/workers/ipa.worker.js`; nếu Worker không có (vd mở bằng `file://`) thì tự chạy trên luồng chính và ghi cảnh báo. Chi tiết API: `INTERFACES.md`. Tiến độ: `HANDOFF.md`. Việc tiếp theo: `NEXT_TASK.md`.
 
 - `State` giữ trạng thái; `UI.render` vẽ lại từ state; `Events` chỉ nối DOM → State.
 - Dữ liệu từ IPA luôn hiển thị bằng `textContent`, không `innerHTML`.

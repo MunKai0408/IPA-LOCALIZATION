@@ -201,3 +201,54 @@ Giải nén archive lồng nhau, phân tích metadata IL2CPP (Phase 4), font (5)
 - `options` có thêm `concurrency`. `FileScanner.scan`: file ≤ 4 MiB (và mọi file ở chế độ fast) chạy song song 8 luồng, file lớn hơn tuần tự; hàng trong `rows` luôn đúng thứ tự gốc, summary tính sau khi xong nên không phụ thuộc thứ tự hoàn thành.
 - `Hash`: API không đổi; SHA-1/SHA-256 đọc byte trực tiếp, CRC32 slicing-by-4 (đo trong Node: SHA-1 156→206, SHA-256 96→139, CRC32 204→512 MB/s; đã đối chiếu lại `crypto`).
 - UI Explorer: chế độ **Xem theo thư mục** (breadcrumb, thư mục tổng hợp số file/dung lượng, “..”) hoặc **Danh sách phẳng**; bật bộ lọc/tìm kiếm thì tự chuyển sang danh sách phẳng; sắp xếp theo đường dẫn/kích thước/loại; bấm một file để xem toàn bộ cột (`#ex-detail`); thẻ tóm tắt hiển thị file trùng. Ids mới: `#ex-mode`, `#ex-sort`, `#ex-crumb`, `#ex-detail`.
+
+---
+# Bổ sung Phase 4 – SUB-PHASE 4.1 Unity Component Discovery (Account 03)
+
+## NS.UnityDump (js/modules/unity_dump.js) – Worker + luồng chính, thuần dữ liệu, KHÔNG I/O
+```
+UnityDump.discover(ipaResult) -> UnityInfo        // ĐỒNG BỘ; ném Error nếu thiếu ipaResult; không sửa đầu vào; kết quả JSON/structuredClone được
+UnityDump.toReportFields(unityInfo) -> { unity_status, unity_runtime, unity_version, unity_metadata_input, unity_metadata_path } | null   // phần Unity của report.json (Phase 9 gộp)
+UnityDump.COMPONENTS (bảng định nghĩa), SCHEMA = 'unity_info/1', SAMPLE_MAX = 25, IL2CPP_MAGIC = 'AF 1B B1 FA', STD_METADATA_PATH = 'data/managed/metadata/global-metadata.dat'
+```
+Đầu vào cần từ IpaResult: `appRoot`, `engine`, `engineProbes`, `manifest.rows` (Phase 3; nếu `manifest` null thì tự dựng hàng tối thiểu từ `entries`), `macho`. Chỉ xét file TRONG `.app` (hàng có `area !== 'ngoài Payload'`).
+```
+UnityInfo (= Meta/unity_info.json) = {
+  schema:'unity_info/1', sub_phase:'4.1',
+  status:'discovered'|'insufficient_evidence'|'not_unity', applicable:boolean,
+     // applicable = (engine Unity & status confirmed/probable) HOẶC có ≥1 thành phần mạnh. insufficient_evidence = chỉ có dấu hiệu yếu (*.assets/*.bundle…)
+  source:{ kind:'manifest'|'entries', rows:number, scanned:boolean, hash_mode:'standard'|'fast'|null },
+  engine: null | { engine, variant, status, confidence, analysis_branch },               // sao từ Phase 2
+  unity_version: null | { value, source },                                                // chỉ từ EngineResult.version (header UnityFS)
+  runtime:{ value:'IL2CPP'|'Mono'|'conflict'|'unresolved'|'not_applicable',
+            evidence:[{component,label,files,example}], engine_variant, agrees_with_engine:true|false|null },
+  components: Component[], components_found:number, components_total:number,
+  metadata_input: MetadataInput, main_binary: null | { path, size, archs:string[], encrypted:true|false|null },
+  notes:string[], warnings:string[]
+}
+Component = { id, label, kind:'framework'|'library'|'metadata'|'directory'|'assembly'|'asset', strong:boolean, runtime:'il2cpp'|'mono'|null,
+              found:boolean, files:number, bytes:number, samples:[{path,size,detected_type,detected_format,extraction_status}] (≤25), truncated:boolean, note }
+   id ∈ unity_framework, libil2cpp, global_metadata, metadata_dir, mono_assemblies, libmono, data_resources, streaming_assets, data_raw, data_unity3d,
+        globalgamemanagers, sharedassets, levels, assets, resource, ress, bundle, unityfs_by_magic            (18 nhóm)
+   Nhóm theo tên file (globalgamemanagers…bundle) loại trừ lẫn nhau theo thứ tự trên; các nhóm còn lại có thể chồng lấn. unityfs_by_magic dựa trên detected_format của Phase 3.
+MetadataInput = {
+  status:'selected'|'missing'|'ambiguous'|'unreadable'|'not_il2cpp'|'not_applicable',
+  path:string|null,          // tương đối với .app
+  entry_path:string|null,    // đường dẫn ĐẦY ĐỦ trong ZIP (dùng cho IpaReader.openZip entries + readEntry/streamEntry ở 4.2)
+  reason:string,
+  candidates:[{ path, entry_path, size, sha1, by_name, by_magic, magic_bytes, magic_matches:true|false|null, phase2_probe_version:number|null,
+                standard_location, extraction_status, error }]
+}
+```
+Quy tắc: ứng viên = tên `global-metadata.dat` HOẶC magic `AF 1B B1 FA` (không phân biệt hoa/thường ở đường dẫn). `selected` khi có đúng một ứng viên đọc được, hoặc đúng một ứng viên ở `Data/Managed/Metadata/` có magic không sai. `magic_matches:false` vẫn có thể `selected` (theo tên) nhưng `reason` cảnh báo; `null` = chưa có magic (không đọc được đầu file). Runtime `Mono` → `not_il2cpp`. Ứng viên bị `unsafe_path/encrypted_zip/unsupported_method/read_error` không được chọn. `phase2_probe_version` chỉ là số đọc nhanh của Phase 2, KHÔNG phải kiểm tra hợp lệ (việc của 4.2).
+
+## Thay đổi ở module cũ
+- `State.PIPELINE_STEPS`: thêm `{ id:'unity', label:'Unity IL2CPP (thành phần)' }` giữa `scan` và `extract` (id cũ giữ nguyên).
+- `IpaReader.analyze`: sau `scan` có bước `unity` (`step('unity', 'done'|'skipped'|'error', …)`); `IpaResult.unity: UnityInfo|null`. Lỗi chỉ thành warning.
+- `Events.applyResult`: `session.results.unity = r.unity`. Nút `#btn-unity-json` tải `unity_info.json`.
+- `UI`: view `metadata` (nhãn “Unity / Metadata”) không còn là view trống: `renderUnity(session)` nội bộ, cache theo tham chiếu `results.unity`. DOM mới: `#view-metadata`, `#unity-empty`, `#unity-detail`, `#unity-body`, `#btn-unity-json`.
+- Worker `importScripts` thêm `../modules/unity_dump.js` (trước `ipa_reader.js`); `index.html` nạp `js/modules/unity_dump.js` sau `file_scanner.js`.
+- `NS.VERSION = '0.5.0-phase4.1'`.
+
+## Chưa tồn tại (đừng gọi)
+Kiểm tra header/phiên bản global-metadata.dat (4.2), trích xuất string literal/namespace/class/method/field và `Meta/metadata_summary.json`, `Text/unity_string_literals.json` (4.3), `il2cpp_api.js`, font (5), text/localization (6), runtime import (7), template (8), Packager/Report/Export (9), engine khác (10).

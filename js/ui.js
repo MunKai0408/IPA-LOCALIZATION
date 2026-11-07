@@ -12,7 +12,7 @@
     text:         { title: 'Văn bản',        icon: '✎', phase: 6, empty: 'Chưa có chuỗi nào được trích xuất.' },
     localization: { title: 'Localization',   icon: '🌐', phase: 6, empty: 'Chưa có bảng ngôn ngữ nào được nhận diện.' },
     runtime:      { title: 'Runtime Strings',icon: '⏱', phase: 7, empty: 'Chưa nhập runtime_strings.jsonl. Website không thể hook game; chỉ nhập dữ liệu do công cụ runtime bên ngoài tạo.' },
-    metadata:     { title: 'Metadata',       icon: '🧬', phase: 4, empty: 'Chưa có metadata Mach-O / IL2CPP.' },
+    metadata:     { title: 'Unity / Metadata', icon: '🧬', phase: 4 },
     report:       { title: 'Báo cáo',        icon: '📄', phase: 9, empty: 'Báo cáo sẽ được tạo từ kết quả phân tích thật sau khi hoàn tất.' },
     settings:     { title: 'Cài đặt',        icon: '☰' }
   };
@@ -171,6 +171,7 @@
     renderDetails(s);
     renderEngine(s);
     renderExplorer(s);
+    renderUnity(s);
   }
 
   /* ---------- Lỗi + chi tiết ứng dụng ---------- */
@@ -399,6 +400,75 @@
       $('#ex-next').addEventListener('click', function () { if ((EX.page + 1) * EX.size < EX.list.length) { EX.page++; exRender(); } });
     }
     exRender();
+  }
+
+  /* ---------- View Unity / Metadata (Phase 4 – sub-phase 4.1) ---------- */
+  const UNITY_STATUS = {
+    discovered: ['Đã tìm thấy thành phần Unity', 'success'], insufficient_evidence: ['Chưa đủ bằng chứng Unity', 'warning'], not_unity: ['Không phải Unity', 'danger']
+  };
+  const META_STATUS = {
+    selected: ['Đã chọn file metadata', 'success'], missing: ['Không tìm thấy file metadata', 'danger'], ambiguous: ['Nhiều ứng viên, chưa chọn', 'warning'],
+    unreadable: ['Có ứng viên nhưng không đọc được', 'danger'], not_il2cpp: ['Không áp dụng (Unity Mono)', ''], not_applicable: ['Không áp dụng', '']
+  };
+  let lastUnity = null;
+  function renderUnity(s) {
+    const u = (s.results && s.results.unity) || null;
+    if (u === lastUnity) return;
+    lastUnity = u;
+    const box = $('#unity-body'), wrap = $('#unity-detail'), empty = $('#unity-empty');
+    if (!box || !wrap || !empty) return;
+    box.replaceChildren(); wrap.hidden = !u; empty.hidden = !!u;
+    if (!u) return;
+
+    const st = UNITY_STATUS[u.status] || ['', ''];
+    const info = h('dl', { class: 'kv' });
+    info.appendChild(h('dt', { text: 'Kết luận' }));
+    info.appendChild(h('dd', {}, [h('span', { class: 'badge ' + st[1], text: st[0] })]));
+    kvRow(info, 'Engine (Phase 2)', u.engine ? u.engine.engine + (u.engine.variant ? ' ' + u.engine.variant : '') + ' · ' + u.engine.status : 'Không có');
+    kvRow(info, 'Biến thể runtime', ({ IL2CPP: 'IL2CPP', Mono: 'Mono', conflict: 'Xung đột (có cả IL2CPP và Mono)', unresolved: 'Chưa xác định', not_applicable: 'Không áp dụng' })[u.runtime.value] || u.runtime.value);
+    kvRow(info, 'Phiên bản Unity', u.unity_version ? u.unity_version.value + ' (đọc từ ' + u.unity_version.source + ')' : 'Không đọc được từ dữ liệu');
+    kvRow(info, 'Binary chính', u.main_binary ? u.main_binary.path + ' · ' + (u.main_binary.archs.join(', ') || '?') + (u.main_binary.encrypted === true ? ' · MÃ HÓA FairPlay' : u.main_binary.encrypted === false ? ' · không mã hóa' : ' · không rõ mã hóa') : 'Không đọc được');
+    kvRow(info, 'Nguồn dữ liệu', u.source.kind === 'manifest' ? 'Manifest Phase 3 (' + u.source.rows + ' file trong .app' + (u.source.hash_mode ? ', chế độ ' + u.source.hash_mode : '') + ')' : 'Chỉ danh sách entry (không có manifest)');
+    const head = h('div', { class: 'card' }, [h('h2', { class: 'section-title', text: 'Kết quả dò Unity' }), info]);
+    if (u.runtime.evidence.length) {
+      head.appendChild(listBlock('Bằng chứng phân biệt IL2CPP/Mono', u.runtime.evidence.map(function (e) { return e.label + ' — ' + e.files + ' file' + (e.example ? ' (vd ' + e.example + ')' : ''); })));
+    }
+    box.appendChild(head);
+
+    const comp = h('div', { class: 'card mt-3' }, [h('h2', { class: 'section-title', text: 'Thành phần Unity (' + u.components_found + '/' + u.components_total + ' nhóm có mặt)' })]);
+    u.components.forEach(function (c) {
+      if (!c.found) return;
+      const items = c.samples.map(function (x) { return x.path + ' — ' + formatBytes(x.size) + (x.detected_format ? ' · ' + x.detected_format : ''); });
+      if (c.truncated) items.push('… (chỉ liệt kê ' + c.samples.length + ' / ' + c.files + ' file)');
+      comp.appendChild(listBlock(c.label + ' — ' + c.files + ' file, ' + formatBytes(c.bytes), items, 40));
+      if (c.note) comp.appendChild(h('p', { class: 'dim', text: c.note }));
+    });
+    const missing = u.components.filter(function (c) { return !c.found; }).map(function (c) { return c.label; });
+    comp.appendChild(listBlock('Không tìm thấy', missing));
+    box.appendChild(comp);
+
+    const ms = META_STATUS[u.metadata_input.status] || ['', ''];
+    const mi = h('dl', { class: 'kv' });
+    mi.appendChild(h('dt', { text: 'Trạng thái' }));
+    mi.appendChild(h('dd', {}, [h('span', { class: 'badge ' + ms[1], text: ms[0] })]));
+    kvRow(mi, 'File đầu vào', u.metadata_input.path);
+    kvRow(mi, 'Lý do', u.metadata_input.reason);
+    const mc = h('div', { class: 'card mt-3' }, [h('h2', { class: 'section-title', text: 'File global-metadata.dat đầu vào' }), mi]);
+    if (u.metadata_input.candidates.length) {
+      mc.appendChild(listBlock('Ứng viên', u.metadata_input.candidates.map(function (c) {
+        return c.path + ' — ' + formatBytes(c.size) + ' · magic: ' + (c.magic_bytes ? c.magic_bytes.split(' ').slice(0, 8).join(' ') : 'chưa đọc') + (c.magic_matches === true ? ' (khớp IL2CPP)' : c.magic_matches === false ? ' (KHÔNG khớp)' : '')
+          + (c.phase2_probe_version !== null ? ' · probe Phase 2: v' + c.phase2_probe_version : '') + (c.extraction_status && c.extraction_status !== 'ok' ? ' · ' + c.extraction_status : '');
+      })));
+    }
+    mc.appendChild(h('p', { class: 'dim mt-2', text: 'Mới chỉ xác định file. Kiểm tra header, phiên bản metadata và trích xuất sẽ có ở sub-phase 4.2 và 4.3. Phiên bản “probe Phase 2” chỉ là số đọc nhanh từ 8 byte đầu, chưa phải kiểm tra hợp lệ.' }));
+    box.appendChild(mc);
+
+    if (u.warnings.length || u.notes.length) {
+      box.appendChild(h('div', { class: 'card mt-3' }, [
+        u.warnings.length ? listBlock('Cảnh báo', u.warnings) : null,
+        u.notes.length ? listBlock('Ghi chú', u.notes) : null
+      ]));
+    }
   }
 
   /* ---------- Log viewer ---------- */

@@ -374,7 +374,7 @@
       hasScInfo: scInfo,
       entries: entries.map(function (e) { return { path: e.name, size: e.size, csize: e.csize, method: e.method, dir: e.dir, unsafe: e.unsafe, encrypted: e.encrypted }; }),
       warnings: warnings, errors: errors,
-      engine: null, engineProbes: [], manifest: null
+      engine: null, engineProbes: [], manifest: null, unity: null
     };
 
     /* --- Bước 3: nhận diện engine (Phase 2). Lỗi ở đây không làm hỏng kết quả Phase 1. --- */
@@ -410,6 +410,28 @@
       if (e && e.code === 'CANCELLED') throw e;
       warn('Quét file thất bại: ' + ((e && e.message) || e));
       step('scan', 'error', (e && e.message) || 'Lỗi');
+    }
+    progress(0.97);
+
+    /* --- Bước 5: tìm thành phần Unity/IL2CPP (Phase 4, sub-phase 4.1). Thuần dữ liệu (không I/O). Lỗi chỉ thành cảnh báo. --- */
+    step('unity', 'running', 'Tìm thành phần Unity');
+    try {
+      if (!NS.UnityDump) throw new IpaError('NO_UNITY_MODULE', 'Thiếu module unity_dump.js');
+      const u = NS.UnityDump.discover(result);
+      result.unity = u;
+      if (u.status === 'discovered') {
+        log('SUCCESS', 'Unity: tìm thấy ' + u.components_found + '/' + u.components_total + ' nhóm thành phần; runtime ' + u.runtime.value + '; metadata đầu vào: ' + u.metadata_input.status,
+            { metadataPath: u.metadata_input.path, candidates: u.metadata_input.candidates.length });
+        u.warnings.forEach(function (w) { log('WARNING', 'Unity: ' + w); });
+        step('unity', 'done', u.runtime.value + ' · metadata ' + u.metadata_input.status);
+      } else {
+        log('INFO', 'Unity: ' + (u.status === 'insufficient_evidence' ? 'chỉ có dấu hiệu yếu, chưa kết luận là Unity' : 'không có thành phần Unity') + ' – bỏ qua nhánh Unity');
+        step('unity', 'skipped', u.status === 'insufficient_evidence' ? 'Chưa đủ bằng chứng Unity' : 'Không phải Unity');
+      }
+    } catch (e) {
+      if (e && e.code === 'CANCELLED') throw e;
+      warn('Tìm thành phần Unity thất bại: ' + ((e && e.message) || e));
+      step('unity', 'error', (e && e.message) || 'Lỗi');
     }
     progress(1);
     return result;

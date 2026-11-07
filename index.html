@@ -31,7 +31,7 @@
       <button class="nav-item" data-view="text"><span class="nav-icon" aria-hidden="true">✎</span>Văn bản</button>
       <button class="nav-item" data-view="localization"><span class="nav-icon" aria-hidden="true">🌐</span>Localization</button>
       <button class="nav-item" data-view="runtime"><span class="nav-icon" aria-hidden="true">⏱</span>Runtime Strings</button>
-      <button class="nav-item" data-view="metadata"><span class="nav-icon" aria-hidden="true">🧬</span>Metadata</button>
+      <button class="nav-item" data-view="metadata"><span class="nav-icon" aria-hidden="true">🧬</span>Unity / Metadata</button>
       <button class="nav-item" data-view="report"><span class="nav-icon" aria-hidden="true">📄</span>Báo cáo</button>
       <button class="nav-item" data-view="settings"><span class="nav-icon" aria-hidden="true">☰</span>Cài đặt</button>
     </nav>
@@ -71,7 +71,7 @@
           </div>
           <dl class="file-info" id="file-info"></dl>
           <p class="mt-2"><span class="badge" id="file-check" hidden></span></p>
-          <p class="card mt-3" id="phase-note" hidden>ℹ️ Phase 3 hoàn tất: đã đọc cấu trúc IPA, nhận diện engine và quét danh sách file (xem mục “Engine” và “File Explorer”). Trích xuất font/chuỗi và các bước sau sẽ có ở phase sau nên vẫn ở trạng thái “Chờ”.</p>
+          <p class="card mt-3" id="phase-note" hidden>ℹ️ Đã xong: đọc cấu trúc IPA, nhận diện engine, quét file và dò thành phần Unity (xem “Engine”, “File Explorer”, “Unity / Metadata”). Đọc header metadata, font, chuỗi và các bước sau sẽ có ở phase sau nên vẫn ở trạng thái “Chờ”.</p>
           <div class="card banner-error mt-3" id="error-banner" role="alert" hidden></div>
           <div class="card mt-3" id="bundle-picker" hidden></div>
           <div class="field mt-3" id="hash-field">
@@ -148,6 +148,19 @@
         </div>
       </section>
 
+      <!-- UNITY / METADATA (Phase 4 – sub-phase 4.1: thành phần + file đầu vào) -->
+      <section class="view" id="view-metadata" hidden>
+        <div class="card empty" id="unity-empty">
+          <div class="empty-icon" aria-hidden="true">🧬</div>
+          <h2>Unity / Metadata</h2>
+          <p>Chưa có kết quả. Tải IPA ở mục “Phân tích IPA” rồi bấm Bắt đầu phân tích. Bước này chỉ dò thành phần Unity và chọn file global-metadata.dat; chưa đọc nội dung metadata.</p>
+        </div>
+        <div id="unity-detail" hidden>
+          <div class="toolbar"><span class="spacer"></span><button class="btn btn-sm" id="btn-unity-json" type="button">Tải unity_info.json</button></div>
+          <div id="unity-body"></div>
+        </div>
+      </section>
+
       <!-- Các view chưa triển khai (ui.js sinh ra) -->
       <div id="generic-views"></div>
 
@@ -177,6 +190,7 @@
 <script src="js/modules/archive_scanner.js"></script>
 <script src="js/modules/detect_engine.js"></script>
 <script src="js/modules/file_scanner.js"></script>
+<script src="js/modules/unity_dump.js"></script>
 <script src="js/ipa_reader.js"></script>
 <script src="js/worker_manager.js"></script>
 <script src="js/state.js"></script>

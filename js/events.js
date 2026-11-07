@@ -42,10 +42,10 @@
                            analysis_branch: r.engine.analysis_branch, version: r.engine.version } : null,
       stats: Object.assign({}, s.stats, { totalFiles: r.manifest ? r.manifest.summary.totalFiles : r.zip.fileCount }),
       manifest: r.manifest ? { summary: r.manifest.summary, options: r.manifest.options, generatedAt: r.manifest.generatedAt } : null,
-      results: Object.assign({}, s.results, { ipa: r, engine: r.engine || null, manifest: r.manifest || null, reportEngine: r.engine ? NS.DetectEngine.toReportFields(r.engine) : null })
+      results: Object.assign({}, s.results, { ipa: r, engine: r.engine || null, manifest: r.manifest || null, unity: r.unity || null, reportEngine: r.engine ? NS.DetectEngine.toReportFields(r.engine) : null })
     });
     r.warnings.forEach(function (w) { /* đã log trong IpaReader qua hook */ });
-    L.success('Phase 1–3 hoàn tất: đã đọc cấu trúc IPA, nhận diện engine và quét file', { module: 'events', step: 'read', details: { bundleId: r.app.bundleId, files: r.zip.fileCount, arch: r.architectures } });
+    L.success('Phase 1–4.1 hoàn tất: đã đọc cấu trúc IPA, nhận diện engine, quét file và dò thành phần Unity', { module: 'events', step: 'read', details: { bundleId: r.app.bundleId, files: r.zip.fileCount, arch: r.architectures } });
     UI.toast(r.engine ? 'Engine: ' + r.engine.engine + (r.engine.variant ? ' ' + r.engine.variant : '') + ' (' + r.engine.status + ')' : 'Đã đọc xong cấu trúc IPA', r.engine && r.engine.status === 'unknown' ? 'warning' : 'success');
   }
 
@@ -134,6 +134,13 @@
       if (!m) { UI.toast('Chưa có manifest để tải', 'warning'); return; }
       const url = URL.createObjectURL(new Blob([NS.FileScanner.toCsv(m)], { type: 'text/csv;charset=utf-8' }));
       const a = document.createElement('a'); a.href = url; a.download = 'manifest.csv';
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    });
+    $('#btn-unity-json').addEventListener('click', function () {
+      const u = S.get().session.results.unity;
+      if (!u) { UI.toast('Chưa có kết quả Unity để tải', 'warning'); return; }
+      const url = URL.createObjectURL(new Blob([JSON.stringify(u, null, 2)], { type: 'application/json;charset=utf-8' }));
+      const a = document.createElement('a'); a.href = url; a.download = 'unity_info.json';
       document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
     });
     $('#btn-log-download').addEventListener('click', function () {

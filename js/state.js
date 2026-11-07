@@ -8,6 +8,7 @@
     { id: 'plist',    label: 'Phân tích Info.plist' },
     { id: 'engine',   label: 'Nhận diện engine' },
     { id: 'scan',     label: 'Quét file' },
+    { id: 'unity',    label: 'Unity IL2CPP (thành phần)' },
     { id: 'extract',  label: 'Trích xuất dữ liệu' },
     { id: 'fonts',    label: 'Phân tích font' },
     { id: 'report',   label: 'Tạo báo cáo' },
