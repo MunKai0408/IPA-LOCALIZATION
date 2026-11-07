@@ -31,7 +31,7 @@ const tbl = async function (name) { const r = await run(name); return r.unity.me
     });
     return { size: off, fields: fields };
   }
-  const versions = [16, 17, 19, 20, 21, 22, 24, 24.1, 24.2, 24.3, 24.4, 24.5, 27, 29, 31];
+  const versions = [16, 17, 19, 20, 21, 22, 23, 24, 24.1, 24.2, 24.3, 24.4, 24.5, 27, 29, 31];
   let schemaOk = true, checked = 0;
   Object.keys(MT.STRUCTS).forEach(function (k) {
     versions.forEach(function (V) {
@@ -65,7 +65,7 @@ const tbl = async function (name) { const r = await run(name); return r.unity.me
     ok(structuredClone(T).types.length === T.types.length && JSON.stringify(structuredClone(T)) === JSON.stringify(T), nm + ': structuredClone/JSON');
     ok(r.unity.schema === 'unity_info/3' && !!r.unity.metadata_literals, nm + ': không ảnh hưởng bước literal');
   }
-  ok(nVer === 18, 'số IPA đúng version đã kiểm: ' + nVer);
+  ok(nVer === 19, 'số IPA đúng version đã kiểm: ' + nVer);
   { const T = await tbl('tbl_v24_0'); ok(T.layout.detected === 24 && T.struct_sizes.image === 32 && T.struct_sizes.typedef === 104, 'v24.0: image 32 B, typedef 104 B');
     const T1 = await tbl('tbl_v24_1'); ok(T1.layout.detected === 24.1 && T1.layout.assembly_layout === 24.1 && T1.struct_sizes.assembly === 68 && T1.struct_sizes.image === 40, 'v24.1 (3 image): nhận đúng 24.1, assembly 68 B (tham chiếu chia nguyên sẽ nhầm khi N<16)');
     const T1p = await tbl('tbl_v24_1plus'); ok(T1p.layout.detected === 24.1 && T1p.layout.assembly_layout === 24.4 && T1p.struct_sizes.assembly === 64, 'v24.1+ (assembly 64 B)');
@@ -83,7 +83,7 @@ const tbl = async function (name) { const r = await run(name); return r.unity.me
   { const r = await run('tbl_not_div'), T = r.unity.metadata_tables; ok(r.unity.metadata_header.status === 'generic_ok' && T.status === 'layout_mismatch' && T.types.length === 0 && /không chia hết/.test(T.reason), 'bảng không chia hết struct → layout_mismatch: ' + T.status + ' ' + T.reason); }
   { const steps = []; const r = await run('tbl_string_beyond', steps), T = r.unity.metadata_tables, st = steps.filter(function (s) { return s[0] === 'tables'; }).pop();
     ok(!T && st && st[1] === 'skipped', 'stringSize vượt file: 4.2 đã chặn (invalid_header) → bước tables skipped: ' + (st && st[1])); }
-  for (const nm of ['m42_bad_magic', 'm42_version_23', 'm42_zero_first_offset', 'm42_no_metadata', 'm42_mono', 'm42_not_unity']) {
+  for (const nm of ['m42_bad_magic', 'm42_version_25', 'm42_zero_first_offset', 'm42_no_metadata', 'm42_mono', 'm42_not_unity']) {
     if (!fs.existsSync(path.join(dir, nm + '.ipa'))) { ok(false, nm + ': thiếu IPA (chạy make_metadata_ipas.py)'); continue; }
     const steps = [], r = await run(nm, steps), st = steps.filter(function (s) { return s[0] === 'tables'; }).pop();
     ok(!r.unity.metadata_tables && st && st[1] === 'skipped', nm + ': không đủ điều kiện → skipped (step=' + (st && st[1]) + ')');

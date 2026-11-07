@@ -59,7 +59,7 @@ const le = function (arr) { return Uint8Array.from(arr); };
   m = await mh('m42_offset_in_header'); ok(m.status === 'invalid_header' && has(m, 'offset_in_header'), 'offset trong header: ' + m.status);
   m = await mh('m42_negative'); ok(m.status === 'invalid_header' && has(m, 'negative'), 'giá trị âm: ' + m.status);
   m = await mh('m42_overlap'); ok(m.status === 'generic_ok' && m.header.overlaps >= 1 && has(m, 'overlap'), 'chồng chéo → cảnh báo, status=' + m.status);
-  for (const [nm, v] of [['m42_version_23', 23], ['m42_version_15', 15], ['m42_version_150', 150]]) {
+  for (const [nm, v] of [['m42_version_25', 25], ['m42_version_15', 15], ['m42_version_150', 150]]) {
     m = await mh(nm);
     ok(m.status === 'unsupported_version' && m.version.value === v && m.header === null && m.raw_header_hex.length > 0, nm + ': ' + m.status);
   }
@@ -122,7 +122,7 @@ const le = function (arr) { return Uint8Array.from(arr); };
   ok(MD.toReportFields(null) === null && MD.toSummary(null) === null, 'report/summary null');
   const rep = MD.toReportFields((await mh('m42_ok_v24'))); ok(rep.metadata_header_status === 'generic_ok' && rep.metadata_version === 24, 'toReportFields');
   const sm = MD.toSummary(await mh('m42_ok_v24')); ok(sm.partial === true && sm.header.status === 'generic_ok', 'toSummary partial');
-  ok(Object.isFrozen(MD) === false && MD.KNOWN_VERSIONS.indexOf(24) >= 0 && MD.KNOWN_VERSIONS.indexOf(23) < 0, 'danh sách version tham chiếu');
+  ok(Object.isFrozen(MD) === false && MD.KNOWN_VERSIONS.indexOf(24) >= 0 && MD.KNOWN_VERSIONS.indexOf(23) >= 0 && MD.KNOWN_VERSIONS.indexOf(25) < 0, 'danh sách version tham chiếu');
 
   console.log(fail ? ('CÓ ' + fail + ' LỖI / ' + n + ' kiểm tra') : ('TẤT CẢ ĐẠT (' + n + ' kiểm tra)'));
   process.exit(fail ? 1 : 0);

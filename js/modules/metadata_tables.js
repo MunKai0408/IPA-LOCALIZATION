@@ -21,7 +21,7 @@
   const NS = root.IPAStudio = root.IPAStudio || {};
 
   const SCHEMA = 'metadata_tables/1';
-  const TABLE_VERSIONS = [16, 17, 19, 20, 21, 22, 24, 27, 29, 31];
+  const TABLE_VERSIONS = [16, 17, 19, 20, 21, 22, 23, 24, 27, 29, 31];
   const SOURCES = [
     'Perfare/Il2CppDumper @4741d46 – Il2CppDumper/Il2Cpp/MetadataClass.cs (header + struct + [Version(Min,Max)])',
     'Perfare/Il2CppDumper @4741d46 – Il2CppDumper/Il2Cpp/Metadata.cs (thứ tự đọc, nhận diện v24.x, GetStringFromIndex)',

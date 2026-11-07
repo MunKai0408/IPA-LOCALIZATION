@@ -5,9 +5,9 @@ Prompt (mục 27, PHASE 5): “Phát hiện, đọc và trích xuất các file 
 
 ## Trước khi làm (bắt buộc)
 1. Đọc `HANDOFF.md`, `INTERFACES.md` (mục Phase 3 file_scanner/manifest và mục 4.3), file này; prompt mục 3, 12, 22, 24, 27 (PHASE 5), 28. Mã nguồn là căn cứ nếu tài liệu mâu thuẫn.
-2. Giải nén zip, `node --check` mọi JS, tạo IPA giả và chạy: `D=/tmp/fake_ipas; python3 tests/make_fake_ipas.py $D && python3 tests/make_scan_ipa.py $D && python3 tests/make_unity_ipas.py $D && python3 tests/make_metadata_ipas.py $D && python3 tests/make_literal_ipas.py $D && python3 tests/make_tables_ipas.py $D` rồi 6 bộ test: detect **359**, scan **112**, unity **86**, metadata **72**, literal **53**, tables **300** (`node tests/run_<tên>_tests.js $D`; tables/literal cần đủ các IPA của make_metadata_ipas.py).
+2. Giải nén zip, `node --check` mọi JS, tạo IPA giả và chạy: `D=/tmp/fake_ipas; python3 tests/make_fake_ipas.py $D && python3 tests/make_scan_ipa.py $D && python3 tests/make_unity_ipas.py $D && python3 tests/make_metadata_ipas.py $D && python3 tests/make_literal_ipas.py $D && python3 tests/make_tables_ipas.py $D` rồi 6 bộ test: detect **359**, scan **112**, unity **86**, metadata **72**, literal **53**, tables **314** (`node tests/run_<tên>_tests.js $D`; tables/literal cần đủ các IPA của make_metadata_ipas.py).
 3. Không viết lại Phase 0–4, không đổi kiến trúc.
-4. Hỏi người dùng (nếu chưa có): log/ảnh trên IPA Unity IL2CPP THẬT — thẻ “Header metadata”, “String literal”, “Assembly/class/method/field”, version thật. Nếu kết quả thật sai thì sửa Phase 4 trước (đặc biệt giả định cặp header #0/#1 và nhận diện v24.x).
+4. Đã có 1 log thật (DATA WING, v23 – xem HANDOFF.md); cần log/ảnh SAU khi chạy bản 0.8.1. Hỏi người dùng (nếu chưa có): log/ảnh trên IPA Unity IL2CPP THẬT — thẻ “Header metadata”, “String literal”, “Assembly/class/method/field”, version thật. Nếu kết quả thật sai thì sửa Phase 4 trước (đặc biệt giả định cặp header #0/#1 và nhận diện v24.x).
 
 ## Phạm vi 5.1 (gợi ý, đối chiếu lại với prompt mục 12)
 - Module mới `js/modules/font_dump.js` (`NS.FontDump`), dùng manifest Phase 3 (`session.results.manifest`) để tìm font theo magic bytes (TTF/OTF/TTC/WOFF/WOFF2 đã có trong magic_bytes.js) VÀ theo đuôi (.fnt/.bmfont/.atlas là text/BMFont, không tin đuôi hoàn toàn).

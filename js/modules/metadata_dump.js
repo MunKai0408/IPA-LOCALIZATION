@@ -20,7 +20,8 @@
   const VERSION_RANGE = [16, 200];                 // il2cpp_dumper 0.5.5 từ chối version <16 hoặc >200; Il2CppDumper (Perfare) chỉ nhận 16..31
   const VERSION_PLAUSIBLE_MAX = 1000;              // Il2CppDumper coi version <0 hoặc >1000 là “không phải metadata hợp lệ”
   // Danh sách version “đã biết” theo il2cpp_dumper 0.5.5 (docs.rs). Chỉ dùng để phân loại; KHÔNG kèm bố cục trường.
-  const KNOWN_VERSIONS = [16, 17, 19, 20, 21, 22, 24, 27, 29, 31, 33, 35, 38, 39, 104, 105, 106];
+  // Account 05: thêm 23 – Il2CppDumper nhận 16..31 và log từ IPA THẬT (DATA WING, Unity IL2CPP) có metadata v23. 18/25/26/28/30 vẫn chưa có bằng chứng → không thêm.
+  const KNOWN_VERSIONS = [16, 17, 19, 20, 21, 22, 23, 24, 27, 29, 31, 33, 35, 38, 39, 104, 105, 106];
   const HEADER_MIN = 16, HEADER_MAX = 1024;        // kích thước header chấp nhận ở kiểm tra chung (v24.2 = 264)
   const SOURCES = [
     'Perfare/Il2CppDumper – Il2CppDumper/Il2Cpp/Metadata.cs (magic 0xFAB11BAF, version là int32 kế tiếp, nhận 16..31, v24.2 khi stringLiteralOffset == 264)',
@@ -204,7 +205,7 @@
          string literal data (offset,size), string (offset…) → ba cặp đầu = cặp #0 và #1 trong header.pairs.
      Chỉ hỗ trợ các version mà CẢ HAI nguồn đều nhận (LITERAL_VERSIONS). v≥35 (bỏ length) và header index biến thiên (v38+) → unsupported, KHÔNG đoán.
      assembly/namespace/class/method/field: struct Il2CppImage/TypeDefinition/MethodDefinition/FieldDefinition thay đổi theo version; chỉ có tóm tắt diễn giải, chưa có byte-layout xác minh → KHÔNG trích xuất. */
-  const LITERAL_VERSIONS = [16, 17, 19, 20, 21, 22, 24, 27, 29, 31];
+  const LITERAL_VERSIONS = [16, 17, 19, 20, 21, 22, 23, 24, 27, 29, 31];
   const LITERAL_STRUCT_SIZE = 8;
   const LITERAL_MAX_TABLE = 64 * 1048576;     // 64 MiB bảng (8 triệu literal)
   const LITERAL_MAX_DATA = 256 * 1048576;     // 256 MiB vùng dữ liệu nạp vào RAM

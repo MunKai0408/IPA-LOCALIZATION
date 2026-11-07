@@ -51,7 +51,7 @@ const lit = async function (name) { const r = await run(name); return r.unity.me
   }
 
   /* 4. Không đủ điều kiện: header không đạt / không có metadata → không chạy, bước skipped */
-  for (const nm of ['m42_bad_magic', 'm42_version_23', 'm42_zero_first_offset', 'm42_no_metadata', 'm42_mono', 'm42_not_unity']) {
+  for (const nm of ['m42_bad_magic', 'm42_version_25', 'm42_zero_first_offset', 'm42_no_metadata', 'm42_mono', 'm42_not_unity']) {
     const steps = [], r = await run(nm, steps), l = r.unity.metadata_literals, st = steps.filter(function (s) { return s[0] === 'literals'; }).pop();
     ok(!l && st && st[1] === 'skipped', nm + ': không chạy trích xuất (literals=' + (l && l.status) + ', step=' + (st && st[1]) + ')');
   }

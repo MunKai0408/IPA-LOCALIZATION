@@ -3,6 +3,10 @@
 ## Phiên hiện tại: Account 05 (hoàn tất SUB-PHASE 4.3) → bàn giao cho Account 06
 Vòng quay: 01 → 02 → … → 10 → 01.
 
+## Cập nhật sau log THẬT đầu tiên (Account 05, v0.8.1)
+Log người dùng gửi: `DATA WING_v1.4.1-AppAssassin.ipa` (61 MB, 165 entry, arm64, Unity IL2CPP confirmed 99%, Unity phiên bản không đọc được, 9/18 nhóm thành phần Unity, metadata `Data/Managed/Metadata/global-metadata.dat`) → **metadata version 23**, trước đó bị `unsupported_version` nên literal/tables bị bỏ qua. Il2CppDumper nhận 16..31 (có 23) và schema Min/Max của MetadataClass.cs đã phủ v23, nên đã thêm 23 vào `KNOWN_VERSIONS` (metadata_dump.js), `LITERAL_VERSIONS`, `TABLE_VERSIONS`. 18/25/26/28/30 vẫn KHÔNG hỗ trợ (chưa có bằng chứng). Test: ca “unsupported” đổi từ v23 sang `m42_version_25`; thêm IPA giả `tbl_v23`; kết quả: detect 359, scan 112, unity 86, metadata 72, literal 53, tables 314 – đều đạt.
+**Chưa xác nhận trên file thật:** bố cục v23 chỉ khớp schema nguồn + dữ liệu giả lập. Cần người dùng chạy lại IPA này trên bản 0.8.1 và gửi log + ảnh các thẻ Header / String literal / Assembly-class-method-field. Nếu `layout_mismatch`/`invalid_table` → bố cục thực tế khác, sửa trước khi sang 5.1.
+
 ## Sub-phase 4.3 – METADATA EXTRACTION AND REPORT: HOÀN THÀNH (trên dữ liệu giả lập)
 Account 04 đã làm string literal; **Account 05 đã làm phần còn thiếu: assembly / image / namespace / class / method / field + Meta/dump.cs + báo cáo + UI.**
 **Điều kiện được thỏa:** nguồn xác minh bố cục lấy được bằng `git clone --depth 1 https://github.com/Perfare/Il2CppDumper` (qua proxy của phiên; WebFetch trước đó chỉ trả tóm tắt). Đã đọc đầy đủ `MetadataClass.cs`, `Metadata.cs`, `Outputs/Il2CppConstants.cs`, `Outputs/Il2CppDecompiler.cs` ở commit `4741d46ba9cd6159c5d853eb9d6fc48b4bfa2b1a`. Đây là cách làm được cho các nguồn khác nếu cần (git clone thay vì WebFetch).

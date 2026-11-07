@@ -300,7 +300,7 @@ MetadataDump.extractLiterals(file, unityInfo, entries, {isCancelled?, progress?(
 MetadataDump.decodeLiterals(table:Uint8Array, data:Uint8Array) -> {literals, empty, invalid_utf8, out_of_range, distinct, total_text_bytes}   // THUẦN
 MetadataDump.toReportFields(h, lit?, tables?)  // string_literals_*; metadata_not_supported[5] khi tables chưa ok, [] khi ok + trường metadata_* của MetadataTables.toReportFields
 MetadataDump.toSummary(h, lit?, tables?) -> { schema:'metadata_summary/3' (Account 05; trước là /2), sub_phase:'4.3', partial:!(tables ok), tables:{status,reason,version,layout,counts,struct_sizes,problem_counts,name_problems,not_extracted,reference_sources,notes}|null, header, string_literals:{status,reason,version,count,empty,distinct,invalid_utf8,out_of_range,total_text_bytes,source}|null, not_supported:{assemblies,namespaces,classes,methods,fields:{status:'not_supported',reason}} }
-MetadataDump.LITERAL_VERSIONS=[16,17,19,20,21,22,24,27,29,31], LITERAL_SCHEMA='unity_string_literals/1', NOT_SUPPORTED[5]
+MetadataDump.LITERAL_VERSIONS=[16,17,19,20,21,22,23,24,27,29,31], LITERAL_SCHEMA='unity_string_literals/1', NOT_SUPPORTED[5]
 ```
 ```
 LiteralResult (= results.unity.metadata_literals = Text/unity_string_literals.json) = {
@@ -333,7 +333,7 @@ MetadataTables.decodeTables(hdrInfo, buffers:{strings,images,assemblies,typedefs
 MetadataTables.layoutOf(structName, V) -> {size, fields:[{name,kind,off}]}   // structName ∈ header|aname|assembly|image|typedef|method|parameter|field; V có thể 24.1/24.2/24.4
 MetadataTables.toDumpCs(tablesResult) -> string|null   // null nếu status != 'ok'
 MetadataTables.toReportFields(tablesResult) -> {metadata_tables_status, metadata_assemblies, metadata_images, metadata_namespaces, metadata_types, metadata_methods, metadata_fields, metadata_table_problems}|null
-MetadataTables.TABLE_VERSIONS=[16,17,19,20,21,22,24,27,29,31], LIMITS, SOURCES, STRUCTS, CS_CLASS, NOT_EXTRACTED, SCHEMA='metadata_tables/1'
+MetadataTables.TABLE_VERSIONS=[16,17,19,20,21,22,23,24,27,29,31], LIMITS, SOURCES, STRUCTS, CS_CLASS, NOT_EXTRACTED, SCHEMA='metadata_tables/1'
 ```
 ```
 TablesResult (= results.unity.metadata_tables = Meta/metadata_tables.json) = {

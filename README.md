@@ -13,9 +13,9 @@ Không cần cài đặt hay build. Code dùng script thường (không ES modul
 
 ## Kiểm tra Phase 4.3 (assembly/image/type/method/field + dump.cs)
 ```
-D=/tmp/fake_ipas; python3 tests/make_tables_ipas.py $D && python3 tests/make_literal_ipas.py $D && python3 tests/make_metadata_ipas.py $D && node tests/run_tables_tests.js $D   # 300
+D=/tmp/fake_ipas; python3 tests/make_tables_ipas.py $D && python3 tests/make_literal_ipas.py $D && python3 tests/make_metadata_ipas.py $D && node tests/run_tables_tests.js $D   # 314
 ```
-Bố cục struct lấy từ mã nguồn Il2CppDumper (commit 4741d46, xem `js/modules/metadata_tables.js`); test đối chiếu với schema dẫn xuất tự động từ file C# (`tests/derive_schema_from_cs.py`). Hỗ trợ version 16, 17, 19, 20, 21, 22, 24 (24.0/24.1/24.2/24.4), 27, 29, 31. Tên kiểu của field/tham số KHÔNG có (nằm trong binary). Test dùng metadata GIẢ LẬP.
+Bố cục struct lấy từ mã nguồn Il2CppDumper (commit 4741d46, xem `js/modules/metadata_tables.js`); test đối chiếu với schema dẫn xuất tự động từ file C# (`tests/derive_schema_from_cs.py`). Hỗ trợ version 16, 17, 19, 20, 21, 22, 23, 24 (24.0/24.1/24.2/24.4), 27, 29, 31. Tên kiểu của field/tham số KHÔNG có (nằm trong binary). Test dùng metadata GIẢ LẬP.
 
 ## Kiểm tra Phase 4.3 (string literal)
 ```

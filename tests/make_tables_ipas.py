@@ -52,7 +52,7 @@ def content(n_images):
     return imgs, types
 
 def build(vkey, n_images=3, mutate=None):
-    ver, V, asmV, imgV = {'v16': (16, 16, 16, 16), 'v17': (17, 17, 17, 17), 'v19': (19, 19, 19, 19), 'v20': (20, 20, 20, 20), 'v21': (21, 21, 21, 21), 'v22': (22, 22, 22, 22),
+    ver, V, asmV, imgV = {'v16': (16, 16, 16, 16), 'v17': (17, 17, 17, 17), 'v19': (19, 19, 19, 19), 'v20': (20, 20, 20, 20), 'v21': (21, 21, 21, 21), 'v22': (22, 22, 22, 22), 'v23': (23, 23, 23, 23),
         'v24_0': (24, 24, 24, 24), 'v24_1': (24, 24.1, 24.1, 24.1), 'v24_1plus': (24, 24.1, 24.4, 24.1), 'v24_2': (24, 24.2, 24.2, 24.2), 'v24_4': (24, 24.4, 24.4, 24.4),
         'v27': (27, 27, 27, 27), 'v29': (29, 29, 29, 29), 'v31': (31, 31, 31, 31)}[vkey]
     hV = 24 if ver == 24 and V in (24, 24.1) else V   # header v24.0/24.1 cùng bố cục (272 B)
@@ -129,7 +129,7 @@ def write(name, data, method=zipfile.ZIP_DEFLATED):
         zi = zipfile.ZipInfo(APP + META); zi.compress_type = method; z.writestr(zi, data)
 
 exp = {}
-for vk in ['v16', 'v17', 'v19', 'v20', 'v21', 'v22', 'v24_0', 'v24_1', 'v24_1plus', 'v24_2', 'v24_4', 'v27', 'v29', 'v31']:
+for vk in ['v16', 'v17', 'v19', 'v20', 'v21', 'v22', 'v23', 'v24_0', 'v24_1', 'v24_1plus', 'v24_2', 'v24_4', 'v27', 'v29', 'v31']:
     d, e = build(vk, 3); write('tbl_' + vk, d); exp['tbl_' + vk] = e
 # nhiều image (≥16) cho v24_1 / v24_2 – kiểm chặt chẽ kích thước
 for vk in ['v24_1', 'v24_2', 'v24_4']:
