@@ -40,12 +40,12 @@
       },
       engine: r.engine ? { engine: r.engine.engine, variant: r.engine.variant, confidence: r.engine.confidence, status: r.engine.status,
                            analysis_branch: r.engine.analysis_branch, version: r.engine.version } : null,
-      stats: Object.assign({}, s.stats, { totalFiles: r.manifest ? r.manifest.summary.totalFiles : r.zip.fileCount }),
+      stats: Object.assign({}, s.stats, { totalFiles: r.manifest ? r.manifest.summary.totalFiles : r.zip.fileCount, fontCount: r.fonts && r.fonts.summary ? r.fonts.summary.fonts_valid : null }),
       manifest: r.manifest ? { summary: r.manifest.summary, options: r.manifest.options, generatedAt: r.manifest.generatedAt } : null,
-      results: Object.assign({}, s.results, { ipa: r, engine: r.engine || null, manifest: r.manifest || null, unity: r.unity || null, reportEngine: r.engine ? NS.DetectEngine.toReportFields(r.engine) : null })
+      results: Object.assign({}, s.results, { ipa: r, engine: r.engine || null, manifest: r.manifest || null, unity: r.unity || null, fonts: r.fonts || null, fontFiles: r.font_files || null, reportEngine: r.engine ? NS.DetectEngine.toReportFields(r.engine) : null })
     });
     r.warnings.forEach(function (w) { /* đã log trong IpaReader qua hook */ });
-    L.success('Phase 1–4.3 hoàn tất: đã đọc cấu trúc IPA, nhận diện engine, quét file, dò thành phần Unity, kiểm tra header metadata, trích xuất string literal và assembly/class/method/field', { module: 'events', step: 'read', details: { bundleId: r.app.bundleId, files: r.zip.fileCount, arch: r.architectures } });
+    L.success('Phase 1–4.3 hoàn tất: đã đọc cấu trúc IPA, nhận diện engine, quét file, dò thành phần Unity, kiểm tra header metadata, trích xuất string literal, assembly/class/method/field và phát hiện/trích xuất font (Phase 5.1)', { module: 'events', step: 'read', details: { bundleId: r.app.bundleId, files: r.zip.fileCount, arch: r.architectures } });
     UI.toast(r.engine ? 'Engine: ' + r.engine.engine + (r.engine.variant ? ' ' + r.engine.variant : '') + ' (' + r.engine.status + ')' : 'Đã đọc xong cấu trúc IPA', r.engine && r.engine.status === 'unknown' ? 'warning' : 'success');
   }
 
@@ -173,6 +173,14 @@
       const txt = u && u.metadata_tables ? NS.MetadataTables.toDumpCs(u.metadata_tables) : null;
       if (!txt) { UI.toast('Chưa có dữ liệu để tạo dump.cs', 'warning'); return; }
       dl('dump.cs', txt, 'text/plain;charset=utf-8');
+    });
+    $('#btn-fontindex-json').addEventListener('click', function () {
+      const f = S.get().session.results.fonts; if (!f) { UI.toast('Chưa có kết quả font', 'warning'); return; }
+      dl('font_index.json', JSON.stringify(NS.FontDump.toFontIndex(f), null, 2), 'application/json;charset=utf-8');
+    });
+    $('#btn-fonts-json').addEventListener('click', function () {
+      const f = S.get().session.results.fonts; if (!f) { UI.toast('Chưa có kết quả font', 'warning'); return; }
+      dl('fonts.json', JSON.stringify(NS.FontDump.toFontsJson(f), null, 2), 'application/json;charset=utf-8');
     });
     $('#btn-log-download').addEventListener('click', function () {
       const text = L.toText();

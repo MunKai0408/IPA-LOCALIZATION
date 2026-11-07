@@ -71,7 +71,7 @@
           </div>
           <dl class="file-info" id="file-info"></dl>
           <p class="mt-2"><span class="badge" id="file-check" hidden></span></p>
-          <p class="card mt-3" id="phase-note" hidden>ℹ️ Đã xong: đọc cấu trúc IPA, nhận diện engine, quét file, dò thành phần Unity, kiểm tra header metadata, trích xuất string literal và assembly/class/method/field (xem “Engine”, “File Explorer”, “Unity / Metadata”). Font, chuỗi và các bước sau sẽ có ở phase sau nên vẫn ở trạng thái “Chờ”.</p>
+          <p class="card mt-3" id="phase-note" hidden>ℹ️ Đã xong: đọc cấu trúc IPA, nhận diện engine, quét file, dò thành phần Unity, kiểm tra header metadata, trích xuất string literal, assembly/class/method/field và phát hiện/trích xuất font (xem “Engine”, “File Explorer”, “Unity / Metadata”). Font, chuỗi và các bước sau sẽ có ở phase sau nên vẫn ở trạng thái “Chờ”.</p>
           <div class="card banner-error mt-3" id="error-banner" role="alert" hidden></div>
           <div class="card mt-3" id="bundle-picker" hidden></div>
           <div class="field mt-3" id="hash-field">
@@ -161,6 +161,19 @@
         </div>
       </section>
 
+      <!-- FONT (Phase 5 – sub-phase 5.1: phát hiện + trích xuất font nguyên bản) -->
+      <section class="view" id="view-fonts" hidden>
+        <div class="card empty" id="fonts-empty">
+          <div class="empty-icon" aria-hidden="true">Aa</div>
+          <h2>Font</h2>
+          <p>Chưa có kết quả. Tải IPA ở mục “Phân tích IPA” rồi bấm Bắt đầu phân tích. Bước này tìm file font (TTF/OTF/TTC/WOFF/WOFF2/BMFont) theo nội dung file, trích xuất nguyên bản để tải về và kiểm tra cấu trúc. Family, độ phủ tiếng Việt và font trong asset bundle Unity sẽ có ở sub-phase sau.</p>
+        </div>
+        <div id="fonts-detail" hidden>
+          <div class="toolbar"><span class="spacer"></span><button class="btn btn-sm" id="btn-fontindex-json" type="button">Tải font_index.json</button> <button class="btn btn-sm" id="btn-fonts-json" type="button">Tải fonts.json</button></div>
+          <div class="card mt-3" id="fonts-body"></div>
+        </div>
+      </section>
+
       <!-- Các view chưa triển khai (ui.js sinh ra) -->
       <div id="generic-views"></div>
 
@@ -193,6 +206,7 @@
 <script src="js/modules/unity_dump.js"></script>
 <script src="js/modules/metadata_dump.js"></script>
 <script src="js/modules/metadata_tables.js"></script>
+<script src="js/modules/font_dump.js"></script>
 <script src="js/ipa_reader.js"></script>
 <script src="js/worker_manager.js"></script>
 <script src="js/state.js"></script>

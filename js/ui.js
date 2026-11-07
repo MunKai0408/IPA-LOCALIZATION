@@ -8,7 +8,7 @@
     analyze:      { title: 'Phân tích IPA',  icon: '⬆' },
     engine:       { title: 'Engine',         icon: '⚙', phase: 2 },
     explorer:     { title: 'File Explorer',  icon: '🗂', phase: 3 },
-    fonts:        { title: 'Font',           icon: 'Aa', phase: 5, empty: 'Chưa có dữ liệu font. Độ phủ tiếng Việt sẽ được kiểm tra trên font thực sự đọc được.' },
+    fonts:        { title: 'Font',           icon: 'Aa', phase: 5 },
     text:         { title: 'Văn bản',        icon: '✎', phase: 6, empty: 'Chưa có chuỗi nào được trích xuất.' },
     localization: { title: 'Localization',   icon: '🌐', phase: 6, empty: 'Chưa có bảng ngôn ngữ nào được nhận diện.' },
     runtime:      { title: 'Runtime Strings',icon: '⏱', phase: 7, empty: 'Chưa nhập runtime_strings.jsonl. Website không thể hook game; chỉ nhập dữ liệu do công cụ runtime bên ngoài tạo.' },
@@ -172,6 +172,7 @@
     renderEngine(s);
     renderExplorer(s);
     renderUnity(s);
+    renderFonts(s);
   }
 
   /* ---------- Lỗi + chi tiết ứng dụng ---------- */
@@ -496,7 +497,7 @@
       const list = q ? rows.filter(function (x) { return hay(x).toLowerCase().indexOf(q) >= 0; }) : rows;
       const pages = Math.max(1, Math.ceil(list.length / PAGE)); if (page >= pages) page = pages - 1;
       tbody.replaceChildren();
-      list.slice(page * PAGE, page * PAGE + PAGE).forEach(function (x) { tbody.appendChild(h('tr', {}, cells(x).map(function (c) { return h('td', { class: 'path', text: c }); }))); });
+      list.slice(page * PAGE, page * PAGE + PAGE).forEach(function (x) { tbody.appendChild(h('tr', {}, cells(x).map(function (c) { return typeof c === 'string' ? h('td', { class: 'path', text: c }) : h('td', {}, [c]); }))); });
       info.textContent = list.length + ' / ' + rows.length + ' · trang ' + (page + 1) + '/' + pages;
       prev.disabled = page === 0; next.disabled = page >= pages - 1;
     };
@@ -539,6 +540,46 @@
     card.appendChild(h('p', { class: 'dim mt-2', text: 'Bố cục lấy từ mã nguồn Il2CppDumper (xem metadata_tables.js). Dữ liệu trên là từ metadata, chưa đối chiếu với metadata của game thật. Tên kiểu của field/tham số là chỉ số thô vào bảng kiểu của binary, không được suy ra.' }));
     return card;
   }
+  const FONT_ST = { extracted: 'Đã trích xuất', not_font_content: 'Nội dung không phải font', skipped_too_large: 'Bỏ qua: quá lớn', skipped_budget: 'Bỏ qua: hết hạn mức bộ nhớ', read_error: 'Lỗi đọc',
+    unsafe_path: 'Đường dẫn không an toàn', symlink_not_followed: 'Symlink', encrypted_zip: 'Entry mã hóa ZIP', unsupported_method: 'Nén chưa hỗ trợ', pending: 'Chờ' };
+  const FONT_RES = { ok: ['Hoàn tất', 'success'], no_fonts: ['Không tìm thấy font', 'warning'], partial: ['Hoàn tất một phần', 'warning'], error: ['Lỗi', 'danger'], not_run: ['Chưa chạy', ''] };
+  let lastFonts = null;
+  function saveBlob(name, data, type) {
+    const url = URL.createObjectURL(new Blob([data], { type: type || 'application/octet-stream' }));
+    const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+  function renderFonts(s) {
+    const f = (s.results && s.results.fonts) || null;
+    if (f === lastFonts) return; lastFonts = f;
+    const box = $('#fonts-body'), wrap = $('#fonts-detail'), empty = $('#fonts-empty'); if (!box || !wrap || !empty) return;
+    box.replaceChildren(); wrap.hidden = !f; empty.hidden = !!f; if (!f) return;
+    const st = FONT_RES[f.status] || [f.status, ''], sm = f.summary || {};
+    const kv = h('dl', { class: 'kv' });
+    kv.appendChild(h('dt', { text: 'Trạng thái' })); kv.appendChild(h('dd', {}, [h('span', { class: 'badge ' + st[1], text: st[0] })]));
+    kvRow(kv, 'Kết quả', f.reason);
+    kvRow(kv, 'Nguồn ứng viên', f.source.manifest_used ? 'Đuôi file + magic bytes (manifest Phase 3)' : 'Chỉ theo đuôi file (không có manifest)');
+    if (f.summary) {
+      kvRow(kv, 'Ứng viên', sm.candidates + ' · đã trích xuất ' + sm.extracted + ' (' + formatBytes(sm.total_bytes) + ') · font hợp lệ ' + sm.fonts_valid + ' · lỗi cấu trúc/chưa xác minh ' + sm.invalid_or_unverified);
+      kvRow(kv, 'Bị loại/bỏ qua', sm.not_font_content + ' không phải font · ' + sm.skipped + ' quá lớn/hết hạn mức · ' + sm.read_errors + ' lỗi đọc · ' + sm.unsafe_or_unreadable + ' không đọc được');
+      kvRow(kv, 'Định dạng', Object.keys(sm.by_format).map(function (k) { return k + ': ' + sm.by_format[k]; }).join(' · ') || '—');
+      kvRow(kv, 'Khác', sm.duplicates + ' trùng nội dung · ' + sm.ext_mismatch + ' sai đuôi · ' + sm.hash_mismatch + ' SHA-256 khác manifest');
+    }
+    box.appendChild(kv);
+    if (f.items.length) {
+      const files = (s.results && s.results.fontFiles) || {};
+      box.appendChild(buildPagedTable(['#', 'Đường dẫn', 'Định dạng', 'Kích thước', 'Trạng thái', 'Hợp lệ', 'Ghi chú', 'Tải'], f.items, function (it) {
+        const btn = h('button', { class: 'btn btn-sm', type: 'button', text: '⬇', 'aria-label': 'Tải ' + it.file_name });
+        if (it.extracted_path && files[it.extracted_path]) btn.addEventListener('click', function () { saveBlob(it.file_name, files[it.extracted_path]); }); else btn.disabled = true;
+        const notes = [].concat(it.problems, it.error ? [it.error] : [], it.duplicate_of ? ['trùng với ' + it.duplicate_of] : [], it.ext_mismatch ? ['sai đuôi'] : [], it.declared_in_plist ? ['có trong UIAppFonts'] : []);
+        return [String(it.id), it.path, it.format || '—', formatBytes(it.size), FONT_ST[it.extraction_status] || it.extraction_status, it.valid === true ? 'Có' : it.valid === false ? 'Không' : 'Chưa xác minh', notes.join('; '), btn];
+      }, function (it) { return it.path + ' ' + (it.format || '') + ' ' + it.extraction_status; }, 'Tìm font'));
+    }
+    if (f.app_fonts_check.length) box.appendChild(listBlock('UIAppFonts (Info.plist) đối chiếu với file thật', f.app_fonts_check.map(function (x) { return x.declared + ' → ' + (x.status === 'found' ? x.paths.join(', ') : 'KHÔNG THẤY FILE'); })));
+    if (f.not_analyzed.unity_containers.count) box.appendChild(listBlock('Asset/bundle Unity có thể chứa font (chưa parse): ' + f.not_analyzed.unity_containers.count, f.not_analyzed.unity_containers.listed.map(function (x) { return x.path + ' (' + formatBytes(x.size) + ')'; }), 50));
+    if (f.warnings.length) box.appendChild(listBlock('Cảnh báo', f.warnings));
+    box.appendChild(listBlock('Chưa làm ở sub-phase 5.1 (có chủ đích)', f.limitations));
+  }
+  NS.UI_saveBlob = saveBlob;
   let lastUnity = null;
   function renderUnity(s) {
     const u = (s.results && s.results.unity) || null;

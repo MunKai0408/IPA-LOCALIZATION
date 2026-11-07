@@ -498,6 +498,23 @@
       warn('Trích xuất bảng metadata thất bại: ' + ((e && e.message) || e));
       step('tables', 'error', (e && e.message) || 'Lỗi');
     }
+    progress(0.999);
+
+    /* --- Bước 9: font (Phase 5, sub-phase 5.1): phát hiện + trích xuất NGUYÊN BẢN. Lỗi chỉ thành cảnh báo. --- */
+    step('fonts', 'running', 'Phát hiện và trích xuất font');
+    try {
+      if (!NS.FontDump) throw new IpaError('NO_FONT_MODULE', 'Thiếu module font_dump.js');
+      const fr = await NS.FontDump.discover(file, result, entries, { isCancelled: cancelled });
+      result.fonts = fr.fonts; result.font_files = fr.files;
+      const fs = fr.fonts.summary || {};
+      log(fr.fonts.status === 'ok' || fr.fonts.status === 'no_fonts' ? 'SUCCESS' : 'WARNING', 'Font: ' + fr.fonts.status + ' – ' + fr.fonts.reason, fs);
+      fr.fonts.warnings.forEach(function (w) { warn(w); });
+      step('fonts', fr.fonts.status === 'error' ? 'error' : 'done', fr.fonts.status === 'no_fonts' ? 'Không có font' : (fs.fonts_valid || 0) + ' font hợp lệ / ' + (fs.candidates || 0) + ' ứng viên');
+    } catch (e) {
+      if (e && e.code === 'CANCELLED') throw e;
+      warn('Phát hiện font thất bại: ' + ((e && e.message) || e));
+      step('fonts', 'error', (e && e.message) || 'Lỗi');
+    }
     progress(1);
     return result;
   }

@@ -1,11 +1,24 @@
 # HANDOFF.md
 
-## Phiên hiện tại: Account 05 (hoàn tất SUB-PHASE 4.3) → bàn giao cho Account 06
+## Phiên hiện tại: Account 05 (làm tiếp theo yêu cầu người dùng) – SUB-PHASE 5.1 HOÀN THÀNH (trên dữ liệu giả lập) → bàn giao cho Account 06 làm 5.2
+Phase 4 đã xác nhận trên IPA thật (xem mục “XÁC NHẬN TRÊN FILE THẬT” bên dưới). Người dùng yêu cầu “làm tiếp 5.1” nên 5.1 được làm trong cùng phiên.
+
+### 5.1 – FONT DISCOVERY AND EXTRACTION
+Tạo: `js/modules/font_dump.js`, `tests/make_font_ipas.py`, `tests/run_font_tests.js`.
+Sửa: `js/ipa_reader.js` (bước 9 `fonts`), `js/state.js` (nhãn bước), `js/workers/ipa.worker.js` + `index.html` (nạp module, `#view-fonts`, 2 nút tải), `js/ui.js` (`renderFonts`, `buildPagedTable` nhận Node, bỏ placeholder fonts), `js/events.js` (fonts vào session, `stats.fontCount`, nút tải), `js/app.js` (0.9.0-phase5.1), README/INTERFACES/NEXT_TASK/HANDOFF.
+Kiểm thử đã chạy (TẤT CẢ DỮ LIỆU GIẢ LẬP): `node tests/run_font_tests.js` **76 đạt** (classifyBytes thuần; TTF/OTF/TTC 2 font/WOFF/WOFF2/BMFont text-XML-binary/font không đuôi nhận bằng magic; byte trích xuất khớp SHA-256 tính độc lập bằng hashlib và khớp manifest; cắt cụt, WOFF sai length, đuôi sai, .ttf không phải font, .fnt không phải BMFont, .atlas chưa xác minh; trùng nội dung; UIAppFonts found/missing; liệt kê Unity asset chưa parse; ../ không an toàn; file rỗng; chế độ fast; không manifest; hạn mức file/tổng/số lượng; hủy; đầu vào xấu). Mutation: tắt kiểm tra length WOFF / giới hạn bảng sfnt → test fail. Hồi quy: detect 359, scan 112, unity 86, metadata 72, literal 53, tables 314 – đạt. Chromium headless (khung 390 px & 1100 px): view Font, tìm kiếm, tải font (SHA-256 đúng), tải font_index.json/fonts.json, 0 lỗi JS, 0 request ngoài, không tràn ngang.
+**Chưa kiểm thử:** font THẬT (font fixture chỉ có header, không glyph), IPA thật có font; Safari iPhone; bộ nhớ với font lớn (hạn mức 64 MiB/file, 256 MiB tổng là ước lượng, chưa đo trên thiết bị). IPA DATA WING (Unity) chưa kiểm view Font – nhiều game Unity để font trong asset bundle nên có thể “Không tìm thấy font” + cảnh báo Unity chưa parse (đúng thiết kế).
+**Quyết định:** phân loại theo byte đã đọc; font hỏng vẫn giữ nguyên + cờ; `.atlas` không tính là font; byte nằm ngoài JSON (`font_files`); `fonts.json` chỉ có phần phát hiện (metadata = null, không bịa).
+**Hạn chế/ghi nhớ:** không có GitHub liên kết, không commit/push được (zip không có `.git`).
+
+---
+
+## (Trước đó) Account 05 – SUB-PHASE 4.3
 Vòng quay: 01 → 02 → … → 10 → 01.
 
 ## Cập nhật sau log THẬT đầu tiên (Account 05, v0.8.1)
 Log người dùng gửi: `DATA WING_v1.4.1-AppAssassin.ipa` (61 MB, 165 entry, arm64, Unity IL2CPP confirmed 99%, Unity phiên bản không đọc được, 9/18 nhóm thành phần Unity, metadata `Data/Managed/Metadata/global-metadata.dat`) → **metadata version 23**, trước đó bị `unsupported_version` nên literal/tables bị bỏ qua. Il2CppDumper nhận 16..31 (có 23) và schema Min/Max của MetadataClass.cs đã phủ v23, nên đã thêm 23 vào `KNOWN_VERSIONS` (metadata_dump.js), `LITERAL_VERSIONS`, `TABLE_VERSIONS`. 18/25/26/28/30 vẫn KHÔNG hỗ trợ (chưa có bằng chứng). Test: ca “unsupported” đổi từ v23 sang `m42_version_25`; thêm IPA giả `tbl_v23`; kết quả: detect 359, scan 112, unity 86, metadata 72, literal 53, tables 314 – đều đạt.
-**Chưa xác nhận trên file thật:** bố cục v23 chỉ khớp schema nguồn + dữ liệu giả lập. Cần người dùng chạy lại IPA này trên bản 0.8.1 và gửi log + ảnh các thẻ Header / String literal / Assembly-class-method-field. Nếu `layout_mismatch`/`invalid_table` → bố cục thực tế khác, sửa trước khi sang 5.1.
+**XÁC NHẬN TRÊN FILE THẬT (log extractor_2.log, bản 0.8.1):** DATA WING, metadata v23 → header `generic_ok` (32 cặp offset/size trong file); string literal `ok` 8491 (0 UTF-8 sai, 0 ngoài vùng); bảng metadata `ok` – 13 assembly, 13 image, 165 namespace, 4674 type, 36662 method, 24497 field, 33277 tham số (bố cục v23); không báo bất thường cấu trúc (mọi vùng chia hết struct, chỉ số trong phạm vi). Đây là bằng chứng mạnh bố cục v23 đúng, nhưng CHƯA có ảnh/xem nội dung tên (assembly/class) và chưa mở dump.cs thật để kiểm tên; v24.x/27/29/31 và các version khác vẫn chỉ kiểm bằng dữ liệu giả lập. Phase 4 được coi là xong; sang SUB-PHASE 5.1.
 
 ## Sub-phase 4.3 – METADATA EXTRACTION AND REPORT: HOÀN THÀNH (trên dữ liệu giả lập)
 Account 04 đã làm string literal; **Account 05 đã làm phần còn thiếu: assembly / image / namespace / class / method / field + Meta/dump.cs + báo cáo + UI.**

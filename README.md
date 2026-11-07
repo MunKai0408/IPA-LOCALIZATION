@@ -2,7 +2,7 @@
 
 Website phân tích **tĩnh** file IPA game iOS ngay trong trình duyệt để phục vụ Việt hóa. Không backend, không upload dữ liệu.
 
-> Trạng thái: **Phase 4 (4.1, 4.2, 4.3) hoàn thành trên dữ liệu GIẢ LẬP** (4.3 gồm string literal, assembly/image/type/method/field, dump.cs; chưa kiểm thử trên metadata thật). Dòng cũ: sub-phase 4.1 (Unity Component Discovery), trên nền Phase 0–3 (đọc IPA, Info.plist, Mach-O/FairPlay, nhận diện engine, quét file + manifest). Header/phiên bản metadata (4.2), trích xuất metadata (4.3), font, chuỗi… ở các bước sau.
+> Trạng thái: **Phase 5.1 (font discovery/extraction) hoàn thành trên dữ liệu GIẢ LẬP; Phase 4 đã xác nhận trên 1 IPA thật (Unity IL2CPP, metadata v23)**. Trước đó: Phase 4 (4.1, 4.2, 4.3) trên dữ liệu GIẢ LẬP (4.3 gồm string literal, assembly/image/type/method/field, dump.cs; chưa kiểm thử trên metadata thật). Dòng cũ: sub-phase 4.1 (Unity Component Discovery), trên nền Phase 0–3 (đọc IPA, Info.plist, Mach-O/FairPlay, nhận diện engine, quét file + manifest). Header/phiên bản metadata (4.2), trích xuất metadata (4.3), font, chuỗi… ở các bước sau.
 
 ## Chạy thử
 
@@ -10,6 +10,12 @@ Không cần cài đặt hay build. Code dùng script thường (không ES modul
 
 - **Máy tính:** mở `index.html` bằng trình duyệt, hoặc chạy `python3 -m http.server 8000` rồi vào `http://localhost:8000`.
 - **GitHub Pages (khuyên dùng khi dùng iPhone):** repo → Settings → Pages → Source: *Deploy from a branch* → Branch `main`, thư mục `/ (root)` → Save. Sau 1–2 phút mở `https://<user>.github.io/<repo>/`.
+
+## Kiểm tra Phase 5.1 (phát hiện và trích xuất font)
+```
+D=/tmp/fake_ipas; python3 tests/make_font_ipas.py $D && node tests/run_font_tests.js $D   # 76
+```
+Tìm font theo nội dung (TTF/OTF/TTC/WOFF/WOFF2/BMFont) và theo đuôi; trích xuất nguyên bản, kiểm tra cấu trúc header, đối chiếu UIAppFonts, liệt kê asset Unity chưa parse. Chưa đọc family/glyph/độ phủ tiếng Việt (5.2/5.3). Font trong test là GIẢ LẬP (chỉ có header).
 
 ## Kiểm tra Phase 4.3 (assembly/image/type/method/field + dump.cs)
 ```

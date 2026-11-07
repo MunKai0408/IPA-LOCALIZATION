@@ -13,7 +13,7 @@
     { id: 'literals', label: 'Metadata IL2CPP (string literal)' },
     { id: 'tables',   label: 'Metadata IL2CPP (assembly/class/method/field)' },
     { id: 'extract',  label: 'Trích xuất dữ liệu' },
-    { id: 'fonts',    label: 'Phân tích font' },
+    { id: 'fonts',    label: 'Font (phát hiện, trích xuất)' },
     { id: 'report',   label: 'Tạo báo cáo' },
     { id: 'package',  label: 'Đóng gói ZIP' }
   ];

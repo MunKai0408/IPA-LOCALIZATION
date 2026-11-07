@@ -366,3 +366,37 @@ TablesResult (= results.unity.metadata_tables = Meta/metadata_tables.json) = {
 
 ## Chưa tồn tại (đừng gọi)
 - Đóng gói `Meta/dump.cs`, `Meta/metadata_tables.json` vào ZIP (Phase 9). Đọc binary UnityFramework (Il2CppType, RVA, tên kiểu) – chưa có và NGOÀI phạm vi 4.3.
+
+
+---
+# Bổ sung Phase 5 – SUB-PHASE 5.1 Font Discovery and Extraction (Account 05)
+
+## NS.FontDump (js/modules/font_dump.js) – Worker + luồng chính. Nạp SAU metadata_tables.js, TRƯỚC ipa_reader.js (index.html + worker importScripts đã cập nhật)
+```
+FontDump.discover(file, ipaResult, entries, {isCancelled?, progress?(0..1)}) -> Promise<{fonts:FontsResult, files:{[extractedPath:string]:Uint8Array}}>   // chỉ ném CANCELLED. ipaResult cần: appRoot, manifest?, app.appFonts. entries = ENTRY GỐC của openZip
+FontDump.classifyBytes(bytes:Uint8Array, ext:string) -> {kind:'sfnt'|'woff'|'woff2'|'bmfont'|'atlas'|'not_font', format, valid:true|false|null, problems[], num_fonts?, num_tables?}   // THUẦN, theo BYTE
+FontDump.selectCandidates(entries, manifest|null, rootPath) -> {candidates:[{entry,rel,row,ext,selected_by:'ext'|'magic'|'ext+magic'}], unity_containers:[{path,size,detected_format}], manifest_used}   // THUẦN
+FontDump.safeOutPath(rel) -> 'Fonts/original/<rel>'|null   // null nếu có '..', '.', rỗng, ổ đĩa, NUL
+FontDump.toFontIndex(fonts) -> object (= Fonts/font_index.json, schema 'font_index/1', KHÔNG có byte)
+FontDump.toFontsJson(fonts) -> object (= Fonts/fonts.json, schema 'fonts/1': chỉ mục đã trích xuất; family/subfamily/postscript_name/version/glyph_count = null, analysis_status='not_analyzed' – 5.2 điền)
+FontDump.toReportFields(fonts) -> {fonts_status, font_candidates, font_files_extracted, font_files_valid, font_files_invalid_or_unverified, font_files_skipped, font_read_errors, font_app_fonts_missing, font_unity_containers_unparsed}|null
+FontDump.FONT_EXTS=['ttf','otf','ttc','woff','woff2','fnt','bmfont','atlas'], LIMITS={max_file_bytes:64MiB,max_total_bytes:256MiB,max_files:2000,max_listed_unparsed:200} (đối tượng dùng chung; test có thể chỉnh), NOT_DONE[4]
+```
+```
+FontsResult (= results.fonts) = { schema:'fonts_discovery/1', sub_phase:'5.1', status:'ok'|'partial'|'no_fonts'|'error'|'not_run', reason,
+  items:[{id, path(tương đối .app), zip_path, file_name, extension, size, selected_by, kind, format, valid, is_font(valid===true), problems[], 
+          extraction_status:'extracted'|'not_font_content'|'skipped_too_large'|'skipped_budget'|'read_error'|'unsafe_path'|'symlink_not_followed'|'encrypted_zip'|'unsupported_method'|'pending',
+          extracted_path:'Fonts/original/<path>'|null, sha256 (tự tính trên byte đã đọc)|null, manifest_sha256|null, hash_match:true|false|null, duplicate_of:path|null, ext_mismatch, declared_in_plist, num_fonts?, num_tables?, error, analysis_status:'not_analyzed'}],
+  summary:{candidates, extracted, fonts_valid, invalid_or_unverified, not_font_content, skipped, read_errors, unsafe_or_unreadable, duplicates, ext_mismatch, hash_mismatch, total_bytes, by_format{}, app_fonts_declared, app_fonts_missing, unity_containers_unparsed}|null,
+  app_fonts_check:[{declared, status:'found'|'missing', paths[]}], not_analyzed:{unity_containers:{count, listed[≤200], note}}, limits, limitations[], warnings[], source:{manifest_used} }
+```
+**Ngữ nghĩa:** ứng viên = đuôi font HOẶC manifest nhận `Font` theo magic. Phân loại cuối theo BYTE đã đọc (không tin đuôi). `.ttf` không phải font → `not_font_content`, KHÔNG trích xuất. Font nhận ra nhưng cấu trúc sai/cắt cụt → vẫn trích xuất nguyên bản, `valid=false`, `is_font=false`, `problems` nêu lý do. `.atlas` → `valid=null` (không xác minh được là atlas font), không tính là font. Kiểm cấu trúc chỉ ở mức header: sfnt (numTables 1..512, thư mục bảng và từng bảng nằm trong file; TTC kiểm tới 64 font), WOFF/WOFF2 (`length` == kích thước file), BMFont text/XML/binary v3. KHÔNG đọc name/cmap/glyph (5.2/5.3). File asset/bundle Unity (`*.assets|bundle|unity3d|resS|resource` hoặc magic Unity asset) chỉ được LIỆT KÊ là “có thể chứa font, chưa parse”.
+**Byte** nằm ở `results.fontFiles` (UI) / `IpaResult.font_files` (khóa = `extracted_path`); `FontsResult` là JSON thuần (structuredClone OK). Không đưa byte vào JSON.
+
+## Thay đổi ở module cũ (Account 05, 5.1)
+- `IpaReader.analyze`: bước 9 `fonts` (sau `tables`); `IpaResult.fonts`, `IpaResult.font_files`. Lỗi chỉ thành cảnh báo; hủy → CANCELLED. `State.PIPELINE_STEPS`: nhãn `fonts` = 'Font (phát hiện, trích xuất)'.
+- `Events.applyResult`: `session.results.fonts/fontFiles`; `stats.fontCount` = `summary.fonts_valid`. Nút `#btn-fontindex-json`, `#btn-fonts-json`.
+- UI: view `fonts` thật (`#view-fonts`; bỏ placeholder trong `VIEWS.fonts`): tóm tắt, bảng tìm kiếm/phân trang + nút tải từng font, UIAppFonts, Unity chưa parse, cảnh báo, giới hạn. `buildPagedTable` cho phép ô là Node. `NS.VERSION='0.9.0-phase5.1'`.
+
+## Chưa tồn tại (đừng gọi)
+Đóng gói `Fonts/` vào ZIP (Phase 9); `Fonts/vi_coverage.json`, `missing_characters.txt`, `character_coverage.json` (5.3); family/glyph (5.2).
