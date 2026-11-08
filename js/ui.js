@@ -543,16 +543,17 @@
   const FONT_ST = { extracted: 'Đã trích xuất', not_font_content: 'Nội dung không phải font', skipped_too_large: 'Bỏ qua: quá lớn', skipped_budget: 'Bỏ qua: hết hạn mức bộ nhớ', read_error: 'Lỗi đọc',
     unsafe_path: 'Đường dẫn không an toàn', symlink_not_followed: 'Symlink', encrypted_zip: 'Entry mã hóa ZIP', unsupported_method: 'Nén chưa hỗ trợ', pending: 'Chờ' };
   const FONT_RES = { ok: ['Hoàn tất', 'success'], no_fonts: ['Không tìm thấy font', 'warning'], partial: ['Hoàn tất một phần', 'warning'], error: ['Lỗi', 'danger'], not_run: ['Chưa chạy', ''] };
-  let lastFonts = null;
+  let lastFonts = null, lastFontMetrics = null;
   function saveBlob(name, data, type) {
     const url = URL.createObjectURL(new Blob([data], { type: type || 'application/octet-stream' }));
     const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
   }
   function renderFonts(s) {
-    const f = (s.results && s.results.fonts) || null;
-    if (f === lastFonts) return; lastFonts = f;
+    const f = (s.results && s.results.fonts) || null, fmx = (s.results && s.results.fontMetrics) || null;
+    if (f === lastFonts && fmx === lastFontMetrics) return; lastFonts = f; lastFontMetrics = fmx;
     const box = $('#fonts-body'), wrap = $('#fonts-detail'), empty = $('#fonts-empty'); if (!box || !wrap || !empty) return;
-    box.replaceChildren(); wrap.hidden = !f; empty.hidden = !!f; if (!f) return;
+    box.replaceChildren(); wrap.hidden = !f && !fmx; empty.hidden = !!(f || fmx); if (!f && !fmx) return;
+    if (!f) { const only = buildFontMetricsCard(fmx); if (only) box.appendChild(only); return; }
     const st = FONT_RES[f.status] || [f.status, ''], sm = f.summary || {};
     const kv = h('dl', { class: 'kv' });
     kv.appendChild(h('dt', { text: 'Trạng thái' })); kv.appendChild(h('dd', {}, [h('span', { class: 'badge ' + st[1], text: st[0] })]));
@@ -578,8 +579,38 @@
     if (f.not_analyzed.unity_containers.count) box.appendChild(listBlock('Asset/bundle Unity có thể chứa font (chưa parse): ' + f.not_analyzed.unity_containers.count, f.not_analyzed.unity_containers.listed.map(function (x) { return x.path + ' (' + formatBytes(x.size) + ')'; }), 50));
     if (f.warnings.length) box.appendChild(listBlock('Cảnh báo', f.warnings));
     box.appendChild(listBlock('Chưa làm ở sub-phase 5.1 (có chủ đích)', f.limitations));
+    const fmCard = buildFontMetricsCard(fmx); if (fmCard) box.appendChild(fmCard);
   }
   NS.UI_saveBlob = saveBlob;
+
+  /* Thẻ metadata font + độ phủ tiếng Việt (5.2b+5.3). Chỉ nói cmap có ánh xạ; KHÔNG đảm bảo TMP/atlas của game hiển thị được. */
+  const VI_LEVEL = { full: ['Đủ', 'ok'], partial: ['Thiếu', 'warn'], none: ['Không', 'err'], unknown: ['Chưa rõ', ''] };
+  function buildFontMetricsCard(fm) {
+    if (!fm || fm.status === 'not_run') return null;
+    const card = h('div', { class: 'card mt-3' }, [h('h2', { class: 'section-title', text: 'Độ phủ tiếng Việt của font (5.2b + 5.3)' })]);
+    if (fm.status === 'no_fonts' || !fm.summary) { card.appendChild(h('p', { class: 'dim', text: fm.reason || 'Không có font.' })); return card; }
+    const s = fm.summary, kv = h('dl', { class: 'kv' });
+    kvRow(kv, 'Kết quả', fm.reason);
+    kvRow(kv, 'Tiêu chí', 'cmap có ánh xạ tới glyph khác 0 cho 134 ký tự Việt có dấu dựng sẵn (Ạ…ỹ, ă â ê ô ơ ư đ) và chữ cái A–Z a–z');
+    card.appendChild(kv);
+    const items = [];
+    fm.items.forEach(function (it) {
+      if (it.fonts.length) it.fonts.forEach(function (f) { items.push({ it: it, f: f }); }); else items.push({ it: it, f: null });
+    });
+    card.appendChild(buildPagedTable(['Font', 'Tiếng Việt', 'Thiếu', 'Họ font', 'Glyph', 'Nguồn'], items, function (x) {
+      const f = x.f, it = x.it;
+      const nm = it.path.split('/').pop() + (it.fonts.length > 1 && f ? ' #' + f.index : ''), src = it.source === 'unity_font' ? 'Unity' : 'IPA';
+      if (!f) return [nm, it.status + (it.reason ? ' – ' + it.reason : ''), '', '—', '', src];
+      const v = f.vietnamese, lv = VI_LEVEL[v.level] || [v.level, ''];
+      return [nm, lv[0] + (v.covered !== null ? ' (' + v.covered + '/' + v.required + ')' : '') + (v.ascii_letters_ok === false ? ' · thiếu chữ ASCII' : ''), v.missing_count ? v.missing.slice(0, 6).join(' ') + (v.missing_count > 6 ? ' … (' + v.missing_count + ')' : '') : '',
+        f.names.family || f.names.postscript || '—', f.num_glyphs === null ? '' : String(f.num_glyphs), src];
+    }, function (x) { return x.it.path + ' ' + (x.f ? (x.f.names.family || '') + ' ' + x.f.vietnamese.level : x.it.status); }, 'Tìm font'));
+    const probs = []; fm.items.forEach(function (it) { it.problems.forEach(function (p) { probs.push(it.path + ': ' + p); }); it.fonts.forEach(function (f) { f.problems.forEach(function (p) { probs.push(it.path + ': ' + p); }); }); });
+    if (probs.length) card.appendChild(listBlock('Vấn đề trong font', probs, 30));
+    if (fm.warnings.length) card.appendChild(listBlock('Cảnh báo', fm.warnings));
+    card.appendChild(listBlock('Chưa làm', fm.limitations));
+    return card;
+  }
   let lastUnity = null, lastUnityFs = null, lastSerialized = null;
 
   /* Thẻ SerializedFile (sub-phase 5.2c): thống kê object, TextAsset/font nhúng đã trích, MonoBehaviour theo class. Chưa giải mã MonoBehaviour/TMP/Texture. */

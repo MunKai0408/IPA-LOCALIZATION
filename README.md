@@ -108,3 +108,6 @@ Không dùng. ZIP được đọc bằng parser tự viết + `DecompressionStre
 
 ## Cập nhật 0.11.0 (Phase 5, sub-phase 5.2c): đọc SerializedFile
 Đọc `*.assets`, `level*`, `sharedassets*`, `globalgamemanagers` và node SerializedFile trong bundle UnityFS: thống kê loại object, trích nguyên bản TextAsset (`.txt`/`.bin`) và font nhúng trong object Font, quy MonoBehaviour về tên class script (để biết có TMP/localization hay không). Thẻ “SerializedFile” trong view Unity / Metadata, có nút tải từng mục và `unity_serialized.json`. **Chưa** giải mã MonoBehaviour/TMP_FontAsset/Texture. Mới kiểm bằng file giả lập, chưa kiểm file Unity thật. Test: `python3 tests/make_serialized_ipas.py DIR && node tests/run_serialized_tests.js DIR`.
+
+## Cập nhật 0.12.0 (Phase 5, sub-phase 5.2b+5.3): độ phủ tiếng Việt của font
+Đọc name/head/maxp/cmap của TTF/OTF/TTC/WOFF (cả font ngoài Unity và font trích từ object Font của Unity) và kiểm 134 ký tự Việt có dấu dựng sẵn. Thẻ “Độ phủ tiếng Việt của font” trong view Font, tải `font_metrics.json`. Lưu ý: font nguồn đủ tiếng Việt chưa chắc game hiển thị được (TMP dùng atlas tĩnh). Chưa hỗ trợ WOFF2. Test: `python3 tests/make_fontmetrics_fonts.py DIR && node tests/run_fontmetrics_tests.js DIR` (cần fonttools).

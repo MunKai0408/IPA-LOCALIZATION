@@ -16,6 +16,7 @@
     { id: 'fonts',    label: 'Font (phát hiện, trích xuất)' },
     { id: 'unityfs',  label: 'AssetBundle UnityFS (container)' },
     { id: 'serialized', label: 'SerializedFile (TextAsset, font, script)' },
+    { id: 'fontmetrics', label: 'Metadata font & độ phủ tiếng Việt' },
     { id: 'report',   label: 'Tạo báo cáo' },
     { id: 'package',  label: 'Đóng gói ZIP' }
   ];

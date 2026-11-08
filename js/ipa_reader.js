@@ -553,6 +553,25 @@
       warn('Đọc SerializedFile thất bại: ' + ((e && e.message) || e));
       step('serialized', 'error', (e && e.message) || 'Lỗi');
     }
+    progress(0.9999);
+
+    /* --- Bước 12: metadata font + độ phủ tiếng Việt (Phase 5, sub-phase 5.2b+5.3): dùng byte font ĐÃ trích (font_files + serialized_files). Lỗi chỉ thành cảnh báo. --- */
+    step('fontmetrics', 'running', 'Đọc metadata font và độ phủ tiếng Việt');
+    try {
+      if (!NS.FontMetrics) throw new IpaError('NO_FONTMETRICS_MODULE', 'Thiếu module font_metrics.js');
+      const fm = await NS.FontMetrics.scan(result, { isCancelled: cancelled });
+      result.font_metrics = fm; const ms = fm.summary || {};
+      if (fm.status === 'no_fonts') { log('INFO', 'FontMetrics: ' + fm.reason); step('fontmetrics', 'skipped', 'Không có font đã trích'); }
+      else {
+        log(fm.status === 'ok' ? 'SUCCESS' : 'WARNING', 'FontMetrics: ' + fm.status + ' – ' + fm.reason, ms);
+        fm.warnings.forEach(function (w) { warn(w); });
+        step('fontmetrics', fm.status === 'error' ? 'error' : 'done', (ms.vietnamese_full || 0) + ' đủ / ' + (ms.vietnamese_partial || 0) + ' thiếu / ' + (ms.vietnamese_none || 0) + ' không có tiếng Việt');
+      }
+    } catch (e) {
+      if (e && e.code === 'CANCELLED') throw e;
+      warn('Đọc metadata font thất bại: ' + ((e && e.message) || e));
+      step('fontmetrics', 'error', (e && e.message) || 'Lỗi');
+    }
     progress(1);
     return result;
   }

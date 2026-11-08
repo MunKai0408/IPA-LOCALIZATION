@@ -1,6 +1,19 @@
 # HANDOFF.md
 
-## Phiên hiện tại: Account 06 (tiếp) – SUB-PHASE 5.2c SerializedFile reader HOÀN THÀNH (trên dữ liệu giả lập) → bàn giao Account 07 (Bước 0: xác nhận trên dữ liệu thật, rồi 5.2b)
+## Phiên hiện tại: Account 06 (tiếp) – SUB-PHASE 5.2b + 5.3 (METADATA FONT & ĐỘ PHỦ TIẾNG VIỆT) HOÀN THÀNH trên dữ liệu giả lập → bàn giao Account 07
+Người dùng chọn làm việc kiểm glyph tiếng Việt của font (“Làm đi”). Gộp 5.2b (metadata sfnt) và 5.3 (độ phủ tiếng Việt) vì cùng dựa trên cmap.
+Tạo: `js/modules/font_metrics.js`, `tests/make_fontmetrics_fonts.py` (fontTools), `tests/run_fontmetrics_tests.js`. Sửa: `ipa_reader.js` (bước 12), `state.js`, `workers/ipa.worker.js`, `index.html`, `events.js`, `ui.js`, `app.js` (0.12.0-phase5.3), INTERFACES/NEXT_TASK/HANDOFF.
+**Làm được:** name/head/maxp/cmap (format 4/12/6) của TTF/OTF/TTC/WOFF; đếm code point; kiểm 134 ký tự Việt có dấu dựng sẵn + A–Z a–z; thẻ “Độ phủ tiếng Việt của font” trong view Font; `font_metrics.json`; phân tích CẢ font ngoài Unity lẫn font trích từ object Font của Unity (dùng byte đã trích, không đọc lại IPA). **Chưa làm (cố ý):** WOFF2, dấu rời/GSUB, kiểm glyph có hình, đọc TMP_FontAsset (atlas), ghi family/glyph vào `fonts.json`.
+**Kiểm thử (DỮ LIỆU GIẢ LẬP, font dựng bằng fontTools, giá trị mong đợi đọc lại bằng fontTools):** `node tests/run_fontmetrics_tests.js` **120 đạt**: 24 font (TTF format 4 có/không glyphIdArray, format 12 astral, OTF/CFF, TTC 2 font, WOFF, tên chỉ có bản ghi Mac “Café”, ký tự ánh xạ tới `.notdef` KHÔNG tính là có, thiếu đúng 1 ký tự ỹ, đủ 134 nhưng thiếu ASCII, cmap symbol (3,0) → unknown, cmap hỏng, cắt cụt, thiếu head, unitsPerEm=8, numTables 1001/65535, WOFF2 stub, WOFF zip-bomb); `scan` (nguồn ipa_file/unity_font, bỏ khóa ngoài `Fonts/` và giá trị không phải byte, hủy, giới hạn). Mutation: 15 phá hoại → ban đầu 5 sống sót ⇒ thêm fixture (notdef ×3, upem, numTables) ⇒ đều bị bắt. Hồi quy 9 bộ cũ đạt nguyên số lượng. Chromium headless (390/1100 px, worker thật, WOFF giải nén qua DecompressionStream): 7 font → 4 đủ/1 thiếu/2 không có, thẻ hiển thị đúng, tải JSON, 0 lỗi JS, 0 request ngoài, không tràn ngang (cột “Tiếng Việt” đặt sát tên font để thấy ngay trên điện thoại).
+**CHƯA kiểm thử – quan trọng:** (1) font THẬT của DATA WING (Xolonium, VeraMono, Orbitron ×4, SourceCodePro): chưa biết kết quả; (2) bố cục OpenType/WOFF viết từ kiến thức, không đối chiếu spec (mạng tắt); (3) Safari iPhone thật cho `DecompressionStream` (WOFF) – chưa kiểm; (4) font bitmap/BMFont không phân tích.
+**Giới hạn khi diễn giải:** font nguồn có đủ tiếng Việt CHƯA có nghĩa game hiển thị được: TMP (bản cũ trong Unity 5.6) dùng atlas tĩnh trong TMP_FontAsset, chỉ vẽ ký tự có sẵn trong atlas; muốn thêm tiếng Việt phải tạo lại atlas (ngoài khả năng hiện tại). Ngược lại font thiếu tiếng Việt thì chắc chắn thiếu glyph.
+
+### Việc người dùng cần làm để có kết quả thật
+Phân tích lại DATA WING bằng bản 0.12.0 (cần đưa zip lên GitHub Pages), mở view Font → thẻ “Độ phủ tiếng Việt của font”, gửi ảnh hoặc bấm “Tải font_metrics.json”. Đó là dữ liệu duy nhất cho biết 7 font game có tiếng Việt không.
+
+---
+
+## (Trước đó) Account 06 – SUB-PHASE 5.2c SerializedFile reader HOÀN THÀNH (trên dữ liệu giả lập) → bàn giao Account 07 (Bước 0: xác nhận trên dữ liệu thật, rồi 5.2b)
 Lý do làm 5.2c trước 5.2b (người dùng đồng ý “Làm đi”): log thật (extractor_5/6) cho thấy DATA WING KHÔNG có AssetBundle UnityFS nào (“Không có file nào có đuôi/magic của AssetBundle Unity”); 55 file Unity chưa parse là SerializedFile. Dead Cells và PvZ2 không phải Unity; bước UnityFS chạy sạch, không lỗi.
 
 ### KẾT QUẢ DỮ LIỆU THẬT ĐẦU TIÊN cho 5.2c (log extractor.log/extractor_2.log, bản 0.11.0, Account 06 ghi nhận)

@@ -479,3 +479,30 @@ files (byte map, KHÔNG nằm trong JSON) = { 'Text/text_assets/<nguồn>/<tên>
 
 ## Chưa tồn tại (đừng gọi)
 Giải mã MonoBehaviour/TMP_FontAsset/Texture2D/Sprite/AudioClip, đọc .resS/.resource, xuất ZIP (Phase 9), metadata font sfnt (5.2b), độ phủ tiếng Việt (5.3), gộp font Unity vào `fonts.json`.
+
+
+---
+# Bổ sung Phase 5 – SUB-PHASE 5.2b + 5.3 Metadata font & độ phủ tiếng Việt (Account 06)
+
+## NS.FontMetrics (js/modules/font_metrics.js) – Worker + luồng chính. Nạp SAU serialized_file.js, TRƯỚC ipa_reader.js (index.html + worker đã cập nhật)
+```
+FontMetrics.parse(bytes) -> Promise<{status:'parsed'|'not_font'|'invalid'|'too_large'|'unsupported_woff2', container:'ttf'|'otf'|'ttc'|'woff'|'woff2'|null, fonts:[FontInfo], problems[], reason}>   // không ném
+FontMetrics.scan(ipaResult, {isCancelled?, progress?}) -> Promise<FontMetricsResult>   // chỉ ném CANCELLED; lấy byte từ ipaResult.font_files + ipaResult.serialized_files, chỉ khóa 'Fonts/…' và giá trị Uint8Array
+FontMetrics.toIndex(res) / toReportFields(res) -> {fontmetrics_status, fonts_analyzed, fonts_vi_full, fonts_vi_partial, fonts_vi_none}|null
+FontMetrics.VI_REQUIRED (134 code point đã sắp xếp), ASCII_LETTERS (52), LIMITS={max_fonts:2000,max_font_bytes:64MiB,max_tables:1000,max_ttc_fonts:64,max_woff_total:128MiB,max_listed_missing:150}, SCHEMA='font_metrics/1', NOT_DONE[5]
+FontInfo = { index, flavor:'truetype'|'cff'|'khác', tables[], names:{family,subfamily,full,postscript,version,typographic_family,typographic_subfamily}, units_per_em|null, num_glyphs|null,
+  cmap:{status:'ok'|'missing'|'invalid'|'no_unicode_cmap'|'unsupported_format', chosen:{platform,encoding,format}|null, code_points:n|null, subtables[]},
+  vietnamese:{level:'full'|'partial'|'none'|'unknown', required:134, covered:n|null, missing_count:n|null, missing:['U+1EA0',…](≤150), percent:n|null, ascii_letters_ok:bool|null, reason?}, problems[] }
+FontMetricsResult (= results.fontMetrics) = { schema:'font_metrics/1', sub_phase:'5.2b+5.3', status:'ok'|'partial'|'none_parsed'|'no_fonts'|'error'|'not_run', reason,
+  items:[{id,path,source:'ipa_file'|'unity_font',size,status,reason,container,fonts:[FontInfo],vietnamese_level(tốt nhất trong TTC)|null,problems[]}],
+  summary:{fonts,parsed,by_status,vietnamese_full,vietnamese_partial,vietnamese_none,vietnamese_unknown}|null, vietnamese_required:134, limits, limitations[5], warnings[] }
+```
+**Ngữ nghĩa:** `vietnamese.level` chỉ nói cmap Unicode có ánh xạ tới glyph ≠ 0 cho 134 ký tự Việt có dấu dựng sẵn (NFC của a ă â e ê i o ô ơ u ư y × 5 dấu + 6 dạng, hoa/thường, + đ Đ; không tính ASCII). `full` = thiếu 0; `none` = có 0/134; `unknown` = không đọc được cmap Unicode. `ascii_letters_ok` tách biệt (A–Z a–z). KHÔNG kiểm glyph có hình thật, GSUB/GPOS/dấu rời, WOFF2. **Font TMP tĩnh chỉ hiển thị ký tự có trong atlas của TMP_FontAsset → độ phủ file font nguồn là điều kiện cần, không phải đủ.** cmap: ưu tiên format 12 > 4 > 6 trên subtable Unicode (platform 0, hoặc 3 với encoding 1/10). `cmap.code_points` với format 12 đếm theo nhóm (có thể gồm ánh xạ tới glyph 0); với format 4/6 chỉ đếm glyph ≠ 0. name: ưu tiên (3,1,0x409) > (3,1) > platform 0 > (1,0) MacRoman. WOFF giải nén bằng `DecompressionStream('deflate')` (chặn tổng ≤ 128 MiB). TTC: mỗi font con một FontInfo.
+**Rủi ro #1 (chưa kiểm trên font thật của game):** bố cục viết từ kiến thức OpenType/WOFF, không đối chiếu spec (mạng tắt). Đã kiểm với 24 font dựng bằng fontTools (độc lập), CHƯA kiểm trên 7 font của DATA WING.
+
+## Thay đổi ở module cũ (5.2b+5.3)
+- `IpaReader.analyze`: bước 12 `fontmetrics` (sau `serialized`): `IpaResult.font_metrics`; `skipped` khi không có font. `State.PIPELINE_STEPS` thêm `{id:'fontmetrics', label:'Metadata font & độ phủ tiếng Việt'}`. `Events.applyResult`: `results.fontMetrics`; nút `#btn-fontmetrics-json` (view Font) tải `font_metrics.json`. UI: `buildFontMetricsCard` trong view Font (cột: Font, Tiếng Việt, Thiếu, Họ font, Glyph, Nguồn; thứ tự cột ưu tiên màn hình điện thoại); `renderFonts` cache theo cả `results.fontMetrics`. `NS.VERSION='0.12.0-phase5.3'`.
+- `fonts.json`/`FontDump` KHÔNG đổi (chưa ghi family/glyph vào fonts.json; xem NEXT_TASK).
+
+## Chưa tồn tại (đừng gọi)
+Đọc TMP_FontAsset (atlas, bảng ký tự, font nguồn), WOFF2, kiểm dấu rời/GSUB, ghi family/glyph vào `fonts.json`, xuất ZIP (Phase 9), parser/công cụ dịch bảng chuỗi CSV (Phase 6).
