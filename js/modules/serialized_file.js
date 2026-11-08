@@ -145,7 +145,8 @@
     } catch (e) { return null; }
   }
   const FONT_MAGICS = [[0, 1, 0, 0], [0x4F, 0x54, 0x54, 0x4F], [0x74, 0x72, 0x75, 0x65], [0x74, 0x74, 0x63, 0x66], [0x77, 0x4F, 0x46, 0x46], [0x77, 0x4F, 0x46, 0x32]];
-  /** Object Font: tên (chuỗi đầu) + QUÉT mảng byte có int32 độ dài ngay trước và magic font (TTF/OTF/TTC/WOFF/WOFF2). Heuristic: không dựa bố cục trường của Font. */
+  /** Object Font: tên (chuỗi đầu) + QUÉT mảng byte có int32 độ dài ngay trước và magic font (TTF/OTF/TTC/WOFF/WOFF2). Heuristic: không dựa bố cục trường của Font.
+   Trả blob HỢP LỆ đầu tiên; nếu chỉ có blob không hợp lệ → trả ứng viên đó với rejected=true (người gọi không trích). Dữ liệu thật: font Arial built-in 63 byte là false positive. */
   function objectName(ob, le) { try { return utf8(readAlignedString(new Reader(ob, 0, le))); } catch (e) { return ''; } }
   function findEmbeddedFont(ob, le) {
     const name = objectName(ob, le);
@@ -158,8 +159,9 @@
       const bytes = ob.subarray(i, i + len), ext = ob[i] === 0x4F ? 'otf' : ob[i] === 0x74 && ob[i + 1] === 0x74 ? 'ttc' : ob[i] === 0x77 ? (ob[i + 3] === 0x32 ? 'woff2' : 'woff') : 'ttf';
       const c = FD && FD.classifyBytes ? FD.classifyBytes(bytes, ext) : { valid: null, format: ext.toUpperCase(), problems: ['FontDump không có sẵn để kiểm tra'] };
       const hit = { name: name, offset: i, length: len, ext: ext, format: c.format, valid: c.valid, problems: c.problems || [] };
-      if (c.valid === true) return hit; if (!first) first = hit;
+      if (c.valid !== false) return hit; if (!first) first = hit;                 // valid=null (không có FontDump) vẫn nhận; valid=false thì chỉ ghi nhận ứng viên
     }
+    if (first) first.rejected = true;                                              // chỉ có blob không hợp lệ (vd font Arial built-in 63 byte): KHÔNG trích
     return first;
   }
 
@@ -304,7 +306,8 @@
       } else {
         if (res.fonts.length >= LIMITS.max_fonts) continue;
         const f = findEmbeddedFont(ob, le), rec = { id: res.fonts.length, file_id: it.id, source: it.path, path_id: o.path_id, name: f ? f.name : objectName(ob, le), size: f ? f.length : 0, format: f ? f.format : null, valid: f ? f.valid : null, problems: f ? f.problems : [], extraction_status: 'no_embedded_font_found', extracted_path: null, sha256: null };
-        if (f) {
+        if (f && f.rejected) rec.extraction_status = 'rejected_invalid_candidate';
+        else if (f) {
           if (ctx.total + f.length > LIMITS.max_total_extract) rec.extraction_status = 'skipped_budget';
           else { const p = 'Fonts/unity/' + srcDir + '/' + safeSeg(f.name || 'font') + '_' + o.path_id + '.' + f.ext; const fb = ob.slice(f.offset, f.offset + f.length); out[p] = fb; ctx.total += f.length; rec.extracted_path = p; rec.sha256 = sha256(fb); rec.extraction_status = 'extracted'; fo++; }
         }
@@ -324,6 +327,7 @@
     });
     res.text_assets.forEach(function (t) { if (t.extraction_status === 'extracted') { s.text_assets_extracted++; s.extracted_bytes += t.size; if (t.is_text) s.text_assets_text++; } });
     res.fonts.forEach(function (t) { if (t.extraction_status === 'extracted') { s.fonts_extracted++; s.extracted_bytes += t.size; if (t.valid === true) s.fonts_valid++; } });
+    s.fonts_rejected = res.fonts.filter(function (t) { return t.extraction_status === 'rejected_invalid_candidate'; }).length;
     s.unity_versions = Object.keys(uv).sort(); return s;
   }
 

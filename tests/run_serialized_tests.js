@@ -36,6 +36,7 @@ const CAND = Object.keys(EXP).filter(function (k) { return !EXP[k].not_candidate
     ok(SF.decodeMonoScript(SF.readObject(b, i0, 0), true) === null, 'decodeMonoScript trên TextAsset → null');
     const f = SF.findEmbeddedFont(SF.readObject(b, i0, 2), true); ok(f && f.name === 'Roboto' && f.valid === true && f.ext === 'ttf' && f.length === 12 + 48 + 192, 'findEmbeddedFont: ' + JSON.stringify(f && [f.name, f.valid, f.length]));
     ok(SF.findEmbeddedFont(SF.readObject(b, i0, 0), true) === null, 'findEmbeddedFont: object không có font → null');
+    { const fake = new Uint8Array(80); fake.set([5, 0, 0, 0, 65, 114, 105, 97, 108, 0, 0, 0], 0); fake.set([63, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0xFE], 12); const f2 = SF.findEmbeddedFont(fake, true); ok(f2 && f2.rejected === true && f2.valid === false && f2.name === 'Arial', 'tái hiện false positive thật (Arial built-in 63 byte): rejected'); }
     ok((await rejects(function () { return SF.readObject(b, i0, 99); })).code === 'NO_OBJECT', 'readObject không tồn tại');
     ok((await rejects(function () { return SF.readObject(b.subarray(0, 100), i0, 0); })).code === 'RANGE', 'readObject ngoài dữ liệu → RANGE');
   }
@@ -76,8 +77,8 @@ const CAND = Object.keys(EXP).filter(function (k) { return !EXP[k].not_candidate
   /* Font nhúng */
   const exF = [['Data/level0', 'Roboto'], ['Data/resources.assets', 'Arial'], ['Data/level3', 'BeFont'], ['Data/level11', 'TwoBlobs']];
   for (const [p, nm] of exF) { const rec = S.fonts.find(function (t) { return t.source === p && t.name === nm; }); ok(rec && rec.extraction_status === 'extracted' && rec.valid === true && sha(F[rec.extracted_path]) === EXP[p].fonts[0][1] && /\.ttf$/.test(rec.extracted_path), p + ' / ' + nm + ': font trích đúng SHA-256'); }
-  ok(S.fonts.length === 6 && S.fonts.some(function (f) { return f.name === 'NoFont' && f.extraction_status === 'no_embedded_font_found'; }) && S.summary.fonts_extracted === 5 && S.summary.fonts_valid === 4, 'font: 5 trích xuất (4 hợp lệ), 1 không tìm thấy font nhúng: ' + JSON.stringify([S.fonts.length, S.summary.fonts_extracted, S.summary.fonts_valid]));
-  { const fk = S.fonts.find(function (f) { return f.name === 'FakeOnly'; }); ok(fk && fk.extraction_status === 'extracted' && fk.valid === false && fk.problems.length > 0 && sha(F[fk.extracted_path]) === EXP['Data/level11'].fake_sha, 'blob giả chỉ có một mình: vẫn trích nhưng đánh dấu valid=false kèm lý do'); }
+  ok(S.fonts.length === 6 && S.fonts.some(function (f) { return f.name === 'NoFont' && f.extraction_status === 'no_embedded_font_found'; }) && S.summary.fonts_extracted === 4 && S.summary.fonts_valid === 4 && S.summary.fonts_rejected === 1, 'font: 4 trích xuất (đều hợp lệ), 1 bị loại, 1 không tìm thấy font nhúng: ' + JSON.stringify([S.fonts.length, S.summary.fonts_extracted, S.summary.fonts_valid]));
+  { const fk = S.fonts.find(function (f) { return f.name === 'FakeOnly'; }); ok(fk && fk.extraction_status === 'rejected_invalid_candidate' && fk.valid === false && fk.problems.length > 0 && fk.extracted_path === null && !Object.keys(F).some(function (k) { return /FakeOnly/.test(k); }), 'blob giả chỉ có một mình (như font Arial built-in thật): KHÔNG trích, ghi lý do bị loại'); }
   /* MonoBehaviour → class */
   ok(eq(S.mono_classes, { 'MyGame.LocalizationManager': 6, 'TMPro.TMP_FontAsset': 1 }) && S.mono_unresolved === 1, 'MonoBehaviour quy về class: ' + JSON.stringify(S.mono_classes) + ' unresolved=' + S.mono_unresolved);
   ok(eq(it('Data/level0').monobehaviours, EXP['Data/level0'].mb), 'level0: MB theo class (kể cả script ở file ngoài và không xác định): ' + JSON.stringify(it('Data/level0').monobehaviours));
