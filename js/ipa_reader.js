@@ -534,6 +534,25 @@
       warn('Đọc UnityFS thất bại: ' + ((e && e.message) || e));
       step('unityfs', 'error', (e && e.message) || 'Lỗi');
     }
+    progress(0.9998);
+
+    /* --- Bước 11: SerializedFile (Phase 5, sub-phase 5.2c): thống kê object, trích TextAsset/font nhúng, quy MonoBehaviour → class. Lỗi chỉ thành cảnh báo. --- */
+    step('serialized', 'running', 'Đọc SerializedFile (assets/level/bundle node)');
+    try {
+      if (!NS.SerializedFile) throw new IpaError('NO_SERIALIZED_MODULE', 'Thiếu module serialized_file.js');
+      const sr = await NS.SerializedFile.scan(file, result, entries, { isCancelled: cancelled });
+      result.serialized = sr.serialized; result.serialized_files = sr.files; const ss = sr.serialized.summary || {};
+      if (sr.serialized.status === 'no_serialized') { log('INFO', 'SerializedFile: không có file nào'); step('serialized', 'skipped', 'Không có SerializedFile'); }
+      else {
+        log(sr.serialized.status === 'ok' ? 'SUCCESS' : 'WARNING', 'SerializedFile: ' + sr.serialized.status + ' – ' + sr.serialized.reason, ss);
+        sr.serialized.warnings.forEach(function (w) { warn(w); });
+        step('serialized', sr.serialized.status === 'error' ? 'error' : 'done', (ss.parsed || 0) + '/' + (ss.files || 0) + ' file, ' + (ss.text_assets_extracted || 0) + ' TextAsset, ' + (ss.fonts_extracted || 0) + ' font');
+      }
+    } catch (e) {
+      if (e && e.code === 'CANCELLED') throw e;
+      warn('Đọc SerializedFile thất bại: ' + ((e && e.message) || e));
+      step('serialized', 'error', (e && e.message) || 'Lỗi');
+    }
     progress(1);
     return result;
   }

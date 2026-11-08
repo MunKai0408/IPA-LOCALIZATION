@@ -439,3 +439,43 @@ UnityFsResult (= results.unityfs) = { schema:'unityfs_index/1', sub_phase:'5.2a'
 
 ## Chưa tồn tại (đừng gọi)
 SerializedFile reader (danh sách object, ClassID, TextAsset/Font/TMP_FontAsset/Texture2D), xuất node ra `Raw/`/ZIP (Phase 9), metadata font (5.2b), độ phủ tiếng Việt (5.3).
+
+
+---
+# Bổ sung Phase 5 – SUB-PHASE 5.2c SerializedFile reader (Account 06)
+
+## NS.SerializedFile (js/modules/serialized_file.js) – Worker + luồng chính. Nạp SAU unity_fs.js, TRƯỚC ipa_reader.js (index.html + worker đã cập nhật)
+```
+SerializedFile.parse(bytes, fileSize?) -> SerializedInfo   // THUẦN, không ném lỗi. bytes = ≥ header.data_offset byte đầu (hoặc cả file)
+SerializedFile.readObject(bytes /*phải phủ object*/, info, objectIndex) -> Uint8Array(subarray)   // ném SfError{code: NO_OBJECT|RANGE}
+SerializedFile.decodeTextAsset(objBytes, littleEndian) -> {ok, name, script:Uint8Array|null, problem?}   // m_Name + m_Script (chuỗi int32 + căn 4); name giữ lại cả khi lỗi
+SerializedFile.decodeMonoScript(objBytes, littleEndian) -> {name, class_name, namespace, assembly}|null   // null nếu không hợp lệ
+SerializedFile.findEmbeddedFont(objBytes, littleEndian) -> {name, offset, length, ext, format, valid:true|false|null, problems[]}|null   // HEURISTIC: quét mảng byte có int32 độ dài ngay trước + magic sfnt/TTC/WOFF; ưu tiên blob hợp lệ (FontDump.classifyBytes)
+SerializedFile.isSerializedName(basename) / selectCandidates(entries, rootPath) -> [{entry, rel}]   // theo TÊN: globalgamemanagers(.assets), level<N>, sharedassets<N>.assets, *.assets, mainData, unity default resources, unity_builtin_extra
+SerializedFile.scan(file, ipaResult, entries, {isCancelled?, progress?}) -> Promise<{serialized:SerializedResult, files:{[path]:Uint8Array}}>   // chỉ ném CANCELLED; đọc cả node is_serialized của bundle UnityFS (ipaResult.unityfs)
+SerializedFile.toIndex(res) / toReportFields(res) -> {serialized_status, serialized_files, serialized_parsed, serialized_objects, unity_text_assets, unity_embedded_fonts, unity_monobehaviours_resolved}|null
+SerializedFile.LIMITS = {max_file_bytes:256MiB, max_head_bytes:64MiB, max_object_bytes:64MiB, max_total_extract:256MiB, max_files:3000, max_types:1e5, max_objects:5e5, max_text_assets:20000, max_fonts:500, max_bundles:200, max_listed:5000, max_scripts_listed:5000}; SCHEMA='unity_serialized/1'; CLASS_NAMES; NOT_DONE[6]
+```
+```
+SerializedInfo = { status:'parsed'|'not_serialized'|'unsupported_version'|'unsupported_typetree'|'invalid'|'truncated'|'need_more_bytes', reason, need?, header:{version,endian:'little'|'big',metadata_size,file_size,data_offset}|null,
+  unity_version, target_platform, enable_type_tree, types:[{index,class_id,class_name,is_stripped,script_type_index,script_id}], objects:[{index,path_id,byte_start(tuyệt đối),byte_size,type_index,class_id,class_name,script_type_index,in_range}],
+  scripts:[{file_index,path_id}], externals:[{path,guid,type}], class_counts:{ClassName:n}, problems[] }
+SerializedResult (= results.serialized) = { schema:'unity_serialized/1', sub_phase:'5.2c', status:'ok'|'partial'|'none_parsed'|'no_serialized'|'error'|'not_run', reason,
+  files:[{id,path,zip_path,source:'file'|'bundle_node',bundle?,node?,size,status(như SerializedInfo.status|'too_large'|'read_error'),reason,version,unity_version,endian,target_platform,enable_type_tree,type_count,object_count,classes{},externals[],script_count,
+          monobehaviours:{'Namespace.Class':n,'(không xác định)':n}, extraction:'not_needed'|'done'|'too_large', extracted?:{text_assets,fonts}, problems[]}],
+  text_assets:[{id,file_id,source,path_id,name,size,is_text,extraction_status:'extracted'|'failed'|'skipped_budget',extracted_path,sha256,problem}],
+  fonts:[{id,file_id,source,path_id,name,size,format,valid,problems[],extraction_status:'extracted'|'no_embedded_font_found'|'skipped_budget',extracted_path,sha256}],
+  mono_scripts:[{key,name,class_name,namespace,assembly}], mono_classes:{'Namespace.Class':n}, mono_unresolved:n,
+  summary:{files,parsed,objects,by_status,by_class,versions{'v17':n},unity_versions[],text_assets,text_assets_extracted,text_assets_text,fonts,fonts_extracted,fonts_valid,mono_scripts,monobehaviours_resolved,monobehaviours_unresolved,extracted_bytes}, limits, limitations[6], warnings[], source:{candidates_by_name,bundle_nodes} }
+files (byte map, KHÔNG nằm trong JSON) = { 'Text/text_assets/<nguồn>/<tên>_<pathID>.txt|.bin': Uint8Array, 'Fonts/unity/<nguồn>/<tên>_<pathID>.ttf|otf|ttc|woff|woff2': Uint8Array }
+```
+**Ngữ nghĩa/quyết định:** `parsed` = đọc được metadata + bảng object; KHÔNG đọc type tree để giải mã MonoBehaviour. Hỗ trợ version 9–22 (header v22 mở rộng 48 byte; LE/BE theo byte endian; header đầu luôn BE). Type tree kiểu cũ (v<10, v11) → `unsupported_typetree`; version ngoài 9–22 → `unsupported_version`/`not_serialized`. Phần đuôi metadata (scripts/externals) lỗi chỉ thành `problems`, bảng object vẫn dùng. Object ngoài vùng file → `in_range=false`, không trích. TextAsset trích NGUYÊN BYTE (`.txt` nếu UTF-8 hợp lệ, ngược lại `.bin`), KHÔNG chuyển mã/xử lý BOM. Font: trích đúng đoạn byte sfnt tìm được (heuristic, có `valid` + `problems`); blob không hợp lệ vẫn trích nhưng `valid=false`. MonoBehaviour → class: qua `scripts` (v≥17: `types[type].script_type_index`; v11–16: `object.script_type_index`) → (file_index, path_id) → MonoScript đọc được trong IPA (file_index>0 dùng `externals[k-1]` theo basename chữ thường); không tìm thấy → `(không xác định)`. Chỉ đọc đủ file khi có TextAsset/Font/MonoScript và ≤ 256 MiB; lớn hơn: vẫn thống kê class, `extraction:'too_large'`.
+**Rủi ro #1 (chưa kiểm trên file Unity thật):** toàn bộ bố cục (header, type, object table, scripts, externals, TextAsset/MonoScript, căn 4, type tree node 24/32 byte). Nguồn: kiến thức về AssetStudio/UnityPy; mạng tắt, không đối chiếu được.
+
+## Thay đổi ở module cũ (5.2c)
+- `IpaReader.analyze`: bước 11 `serialized` (sau `unityfs`): `IpaResult.serialized`, `IpaResult.serialized_files`. `State.PIPELINE_STEPS` thêm `{id:'serialized', label:'SerializedFile (TextAsset, font, script)'}`. `Events.applyResult`: `results.serialized`, `results.serializedFiles`; nút `#btn-serialized-json` tải `unity_serialized.json`.
+- UI: `buildSerializedCard` trong view `metadata` (hiện cả khi không có `results.unity`): tóm tắt, loại object, class MonoBehaviour, bảng file, TextAsset và font có nút ⬇ tải từng mục, vấn đề, “Chưa làm”. `NS.VERSION='0.11.0-phase5.2c'`. Worker importScripts + index.html thêm `serialized_file.js`.
+- `FontDump` không đổi (font ngoài Unity); font trong object Font nằm ở `results.serialized.fonts`, CHƯA gộp vào `fonts.json`/ZIP (Phase 9).
+
+## Chưa tồn tại (đừng gọi)
+Giải mã MonoBehaviour/TMP_FontAsset/Texture2D/Sprite/AudioClip, đọc .resS/.resource, xuất ZIP (Phase 9), metadata font sfnt (5.2b), độ phủ tiếng Việt (5.3), gộp font Unity vào `fonts.json`.

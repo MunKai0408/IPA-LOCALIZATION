@@ -580,7 +580,45 @@
     box.appendChild(listBlock('Chưa làm ở sub-phase 5.1 (có chủ đích)', f.limitations));
   }
   NS.UI_saveBlob = saveBlob;
-  let lastUnity = null, lastUnityFs = null;
+  let lastUnity = null, lastUnityFs = null, lastSerialized = null;
+
+  /* Thẻ SerializedFile (sub-phase 5.2c): thống kê object, TextAsset/font nhúng đã trích, MonoBehaviour theo class. Chưa giải mã MonoBehaviour/TMP/Texture. */
+  const SF_STATUS = { parsed: 'Đọc được', not_serialized: 'Không giống SerializedFile', unsupported_version: 'Version chưa hỗ trợ', unsupported_typetree: 'Type tree kiểu cũ', invalid: 'Cấu trúc không hợp lệ', truncated: 'Bị cắt cụt', too_large: 'Quá lớn', read_error: 'Lỗi đọc' };
+  function buildSerializedCard(sr, files) {
+    if (!sr || sr.status === 'not_run') return null;
+    const card = h('div', { class: 'card mt-3' }, [h('h2', { class: 'section-title', text: 'SerializedFile (sub-phase 5.2c)' })]);
+    if (sr.status === 'no_serialized' || !sr.summary) { card.appendChild(h('p', { class: 'dim', text: sr.reason || 'Không có SerializedFile.' })); return card; }
+    const s = sr.summary, kv = h('dl', { class: 'kv' });
+    kvRow(kv, 'Kết quả', sr.reason);
+    kvRow(kv, 'File / đọc được', s.files + ' / ' + s.parsed + ' · ' + s.objects + ' object · version ' + Object.keys(s.versions).join(', '));
+    kvRow(kv, 'Phiên bản Unity (từ header file)', s.unity_versions.join(', ') || 'Không đọc được');
+    kvRow(kv, 'TextAsset', s.text_assets_extracted + ' trích xuất / ' + s.text_assets + ' (' + s.text_assets_text + ' là văn bản UTF-8)');
+    kvRow(kv, 'Font trong object Font', s.fonts_extracted + ' trích xuất (' + s.fonts_valid + ' hợp lệ) / ' + s.fonts);
+    kvRow(kv, 'MonoBehaviour', s.monobehaviours_resolved + ' quy về class script · ' + s.monobehaviours_unresolved + ' chưa xác định');
+    card.appendChild(kv);
+    const top = Object.keys(s.by_class).sort(function (a, b) { return s.by_class[b] - s.by_class[a]; });
+    card.appendChild(buildPagedTable(['Loại object', 'Số lượng'], top, function (k) { return [k, String(s.by_class[k])]; }, function (k) { return k; }, 'Tìm loại'));
+    const mono = Object.keys(sr.mono_classes).sort(function (a, b) { return sr.mono_classes[b] - sr.mono_classes[a]; });
+    if (mono.length) card.appendChild(buildPagedTable(['Class script (MonoBehaviour)', 'Số lượng'], mono, function (k) { return [k, String(sr.mono_classes[k])]; }, function (k) { return k; }, 'Tìm class'));
+    card.appendChild(buildPagedTable(['File', 'Trạng thái', 'Version', 'Object', 'Trích xuất'], sr.files, function (it) {
+      return [it.path, (SF_STATUS[it.status] || it.status) + (it.status !== 'parsed' && it.reason ? ' – ' + it.reason : ''), it.version === null ? '' : String(it.version), it.object_count === null ? '' : String(it.object_count), it.extraction || ''];
+    }, function (it) { return it.path + ' ' + it.status; }, 'Tìm file'));
+    const dlBtn = function (rec) {
+      const b = h('button', { class: 'btn btn-sm', type: 'button', text: '⬇', 'aria-label': 'Tải ' + (rec.name || 'tệp') });
+      if (rec.extracted_path && files && files[rec.extracted_path]) b.addEventListener('click', function () { saveBlob(rec.extracted_path.split('/').pop(), files[rec.extracted_path]); }); else b.disabled = true; return b;
+    };
+    if (sr.text_assets.length) card.appendChild(buildPagedTable(['TextAsset', 'Nguồn', 'Kích thước', 'Loại', ''], sr.text_assets, function (t) {
+      return [t.name || '(không tên)', t.source, formatBytes(t.size), t.extraction_status === 'extracted' ? (t.is_text ? 'văn bản' : 'nhị phân') : t.extraction_status + (t.problem ? ' – ' + t.problem : ''), dlBtn(t)];
+    }, function (t) { return t.name + ' ' + t.source; }, 'Tìm TextAsset'));
+    if (sr.fonts.length) card.appendChild(buildPagedTable(['Font (Unity)', 'Nguồn', 'Định dạng', 'Hợp lệ', ''], sr.fonts, function (t) {
+      return [t.name || '(không tên)', t.source, t.format || t.extraction_status, t.valid === true ? 'có' : t.valid === false ? 'không: ' + t.problems.join('; ') : '?', dlBtn(t)];
+    }, function (t) { return t.name + ' ' + t.source; }, 'Tìm font'));
+    const probs = []; sr.files.forEach(function (it) { it.problems.forEach(function (p) { probs.push(it.path + ': ' + p); }); });
+    if (probs.length) card.appendChild(listBlock('Vấn đề trong file', probs, 30));
+    if (sr.warnings.length) card.appendChild(listBlock('Cảnh báo', sr.warnings));
+    card.appendChild(listBlock('Chưa làm', sr.limitations));
+    return card;
+  }
 
   /* Thẻ AssetBundle UnityFS (sub-phase 5.2a): CHỈ container (header/block/node); nội dung node chưa parse. */
   const UFS_STATUS = { parsed: 'Đọc được container', not_unityfs: 'Không phải UnityFS', unsupported_format: 'Định dạng cũ (chưa hỗ trợ)', unsupported_version: 'Phiên bản UnityFS lạ', unsupported_compression: 'Kiểu nén chưa hỗ trợ',
@@ -608,13 +646,13 @@
     return card;
   }
   function renderUnity(s) {
-    const u = (s.results && s.results.unity) || null, uf = (s.results && s.results.unityfs) || null;
-    if (u === lastUnity && uf === lastUnityFs) return;
-    lastUnity = u; lastUnityFs = uf;
+    const u = (s.results && s.results.unity) || null, uf = (s.results && s.results.unityfs) || null, sr = (s.results && s.results.serialized) || null, srFiles = (s.results && s.results.serializedFiles) || null;
+    if (u === lastUnity && uf === lastUnityFs && sr === lastSerialized) return;
+    lastUnity = u; lastUnityFs = uf; lastSerialized = sr;
     const box = $('#unity-body'), wrap = $('#unity-detail'), empty = $('#unity-empty');
     if (!box || !wrap || !empty) return;
-    box.replaceChildren(); wrap.hidden = !u && !uf; empty.hidden = !!(u || uf);
-    if (!u) { const only = buildUnityFsCard(uf); if (only) box.appendChild(only); return; }   // AssetBundle có thể tồn tại dù Phase 4.1 không kết luận Unity
+    box.replaceChildren(); wrap.hidden = !u && !uf && !sr; empty.hidden = !!(u || uf || sr);
+    if (!u) { const o1 = buildUnityFsCard(uf), o2 = buildSerializedCard(sr, srFiles); if (o1) box.appendChild(o1); if (o2) box.appendChild(o2); return; }   // AssetBundle có thể tồn tại dù Phase 4.1 không kết luận Unity
 
     const st = UNITY_STATUS[u.status] || ['', ''];
     const info = h('dl', { class: 'kv' });
@@ -662,6 +700,7 @@
     box.appendChild(buildLiteralsCard(u.metadata_literals));
     box.appendChild(buildTablesCard(u.metadata_tables));
     const ufCard = buildUnityFsCard(uf); if (ufCard) box.appendChild(ufCard);
+    const sfCard = buildSerializedCard(sr, srFiles); if (sfCard) box.appendChild(sfCard);
 
     if (u.warnings.length || u.notes.length) {
       box.appendChild(h('div', { class: 'card mt-3' }, [

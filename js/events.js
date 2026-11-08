@@ -42,7 +42,7 @@
                            analysis_branch: r.engine.analysis_branch, version: r.engine.version } : null,
       stats: Object.assign({}, s.stats, { totalFiles: r.manifest ? r.manifest.summary.totalFiles : r.zip.fileCount, fontCount: r.fonts && r.fonts.summary ? r.fonts.summary.fonts_valid : null }),
       manifest: r.manifest ? { summary: r.manifest.summary, options: r.manifest.options, generatedAt: r.manifest.generatedAt } : null,
-      results: Object.assign({}, s.results, { ipa: r, engine: r.engine || null, manifest: r.manifest || null, unity: r.unity || null, fonts: r.fonts || null, fontFiles: r.font_files || null, unityfs: r.unityfs || null, reportEngine: r.engine ? NS.DetectEngine.toReportFields(r.engine) : null })
+      results: Object.assign({}, s.results, { ipa: r, engine: r.engine || null, manifest: r.manifest || null, unity: r.unity || null, fonts: r.fonts || null, fontFiles: r.font_files || null, unityfs: r.unityfs || null, serialized: r.serialized || null, serializedFiles: r.serialized_files || null, reportEngine: r.engine ? NS.DetectEngine.toReportFields(r.engine) : null })
     });
     r.warnings.forEach(function (w) { /* đã log trong IpaReader qua hook */ });
     L.success('Phase 1–4.3 hoàn tất: đã đọc cấu trúc IPA, nhận diện engine, quét file, dò thành phần Unity, kiểm tra header metadata, trích xuất string literal, assembly/class/method/field và phát hiện/trích xuất font (Phase 5.1)', { module: 'events', step: 'read', details: { bundleId: r.app.bundleId, files: r.zip.fileCount, arch: r.architectures } });
@@ -185,6 +185,10 @@
     $('#btn-unityfs-json').addEventListener('click', function () {
       const f = S.get().session.results.unityfs; if (!f) { UI.toast('Chưa có kết quả UnityFS', 'warning'); return; }
       dl('unityfs_index.json', JSON.stringify(NS.UnityFS.toIndex(f), null, 2), 'application/json;charset=utf-8');
+    });
+    $('#btn-serialized-json').addEventListener('click', function () {
+      const f = S.get().session.results.serialized; if (!f) { UI.toast('Chưa có kết quả SerializedFile', 'warning'); return; }
+      dl('unity_serialized.json', JSON.stringify(NS.SerializedFile.toIndex(f), null, 2), 'application/json;charset=utf-8');
     });
     $('#btn-log-download').addEventListener('click', function () {
       const text = L.toText();

@@ -1,6 +1,29 @@
 # HANDOFF.md
 
-## Phiên hiện tại: Account 06 (theo yêu cầu người dùng “viết thêm parser UnityFS”) – SUB-PHASE 5.2a HOÀN THÀNH (trên dữ liệu giả lập) → bàn giao Account 07 làm 5.2b
+## Phiên hiện tại: Account 06 (tiếp) – SUB-PHASE 5.2c SerializedFile reader HOÀN THÀNH (trên dữ liệu giả lập) → bàn giao Account 07 (Bước 0: xác nhận trên dữ liệu thật, rồi 5.2b)
+Lý do làm 5.2c trước 5.2b (người dùng đồng ý “Làm đi”): log thật (extractor_5/6) cho thấy DATA WING KHÔNG có AssetBundle UnityFS nào (“Không có file nào có đuôi/magic của AssetBundle Unity”); 55 file Unity chưa parse là SerializedFile. Dead Cells và PvZ2 không phải Unity; bước UnityFS chạy sạch, không lỗi.
+
+### 5.2c – SERIALIZEDFILE READER
+Tạo: `js/modules/serialized_file.js`, `tests/make_serialized_ipas.py`, `tests/run_serialized_tests.js`.
+Sửa: `js/ipa_reader.js` (bước 11 `serialized`), `js/state.js`, `js/workers/ipa.worker.js`, `index.html` (module + nút `#btn-serialized-json`), `js/events.js` (`results.serialized`, `results.serializedFiles`, nút tải), `js/ui.js` (`buildSerializedCard`, cache theo `results.serialized`), `js/app.js` (0.11.0-phase5.2c), INTERFACES/NEXT_TASK/HANDOFF.
+**Làm được:** header v9–22 (LE/BE, v22 mở rộng), metadata (type, bảng object, scripts, externals), thống kê ClassID, trích NGUYÊN BẢN TextAsset (`.txt`/`.bin`), trích font nhúng trong object Font (heuristic quét magic + kiểm FontDump), đọc tên MonoScript và quy MonoBehaviour về tên class, đọc cả node SerializedFile trong bundle UnityFS, JSON `unity_serialized.json`, UI có nút ⬇ từng TextAsset/font. **Chưa làm (cố ý):** giải mã MonoBehaviour/TMP_FontAsset/Texture2D/Sprite/AudioClip, .resS/.resource, type tree kiểu cũ (v<10, v11), ZIP (Phase 9), gộp font Unity vào `fonts.json`.
+**Kiểm thử đã chạy (TOÀN BỘ DỮ LIỆU GIẢ LẬP):** `node tests/run_serialized_tests.js` **140 đạt**: 12 SerializedFile hợp lệ (v13, v15 LE+BE, v17 LE+BE, v19/v21 có type tree, v22), trích TextAsset khớp SHA-256 tính độc lập (UTF-8 tiếng Việt giữ nguyên, nhị phân → `.bin`), 5 font trích đúng (blob giả đứng trước font thật → chọn font thật; blob giả một mình → `valid=false` kèm lý do), MonoBehaviour quy về class (script cùng file, ở file ngoài qua externals, không tồn tại → “không xác định”; v15 script ở object; BE), node trong bundle UnityFS; ca lỗi (v9 type tree cũ, version 23, rác, rỗng, cắt cụt, object vượt file, TextAsset hỏng, Font không có font nhúng); hủy, ngân sách trích xuất, file quá lớn, giới hạn số file, đầu vào xấu. Mutation: 12 phá hoại (align4, ngưỡng v14, byteStart v22, node type tree 24/32, typeDependencies v21, script idx v11–16, stripped byte, hash MonoScript, u16 endian, kiểm biên, endian độ dài font, nhận blob không hợp lệ) → test đều fail (3 mutation ban đầu sống sót ⇒ đã thêm fixture level10/level11 để giết). Hồi quy 8 bộ test cũ đạt nguyên số lượng. Chromium headless (390/1100 px, worker thật): bước `serialized` “14/18 file, 13 TextAsset, 5 font”, tải JSON và tải TextAsset (tiếng Việt đúng), 0 lỗi JS, 0 request ngoài, không tràn ngang.
+**CHƯA kiểm thử – quan trọng:** SerializedFile/bundle Unity THẬT (chưa từng có). Fixture do chính Account 06 dựng theo CÙNG giả định bố cục với module → chỉ chứng minh logic nhất quán, KHÔNG chứng minh khớp định dạng Unity thật. Mạng tắt nên không đối chiếu được AssetStudio/UnityPy. Rủi ro lớn nhất: bố cục header/metadata/object table các version, layout TextAsset (m_Name, m_Script), MonoScript (m_Name, executionOrder, hash16, class/namespace/assembly), heuristic tìm font trong object Font. Cũng chưa kiểm: bộ nhớ khi đọc file gần 256 MiB trên iPhone, Safari thật, hiệu năng, game dùng type tree bật (đã bỏ qua node tree theo kích thước 24/32 byte nhưng chưa thử thật), file Unity 3/4 (version <9).
+**Lưu ý game thật:** nhiều game Unity lưu chữ trong MonoBehaviour/ScriptableObject/bảng localization riêng (không phải TextAsset) và TMP_FontAsset; 5.2c chỉ báo CÓ các class đó (qua tên class script) chứ chưa đọc nội dung. Font nhiều khi nằm trong `.resS`/stream hoặc font hệ thống → object Font có thể không có byte font.
+
+### Quyết định
+- Quét theo TÊN file (không có magic cho SerializedFile) + cổng cấu trúc (version 9–22, endian 0/1, data_offset hợp lý).
+- TextAsset giữ NGUYÊN BYTE; không đoán mã hóa. Font: heuristic có gắn `valid`.
+- MonoScript đọc từ mọi file có class 115 (đọc đủ file một lần); MB → class quy sau khi quét xong.
+- Bundle: `UnityFS.open` đọc lại cả bundle (≤ 256 MiB) để `readNode` từng node SerializedFile.
+
+### Hạn chế còn tồn tại
+- Git/GitHub: không có `.git` trong zip, không GitHub liên kết → KHÔNG commit/push được; người dùng cần tự đưa zip lên repo.
+- Như 5.1/5.2a (font thật, Safari iPhone, bộ nhớ).
+
+---
+
+## (Trước đó) Account 06 (theo yêu cầu người dùng “viết thêm parser UnityFS”) – SUB-PHASE 5.2a HOÀN THÀNH (trên dữ liệu giả lập) → bàn giao Account 07 làm 5.2b
 Vòng quay: 01 → … → 10 → 01. Account 05 đã bàn giao 5.1; NEXT_TASK cũ là “5.2 font metadata + TMP (UnityFS chỉ làm nếu parser đọc được an toàn)”. Người dùng yêu cầu parser UnityFS nên Account 06 làm đúng phần UnityFS (5.2a) và CHƯA làm metadata font (chuyển thành 5.2b).
 
 ### 5.2a – UNITYFS CONTAINER PARSER
