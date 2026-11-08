@@ -117,3 +117,6 @@ Kiểm thử (giả lập): `python3 tests/make_tmp_ipas.py /tmp/fake_ipas && no
 
 ## Cập nhật 0.12.0 (Phase 5, sub-phase 5.2b+5.3): độ phủ tiếng Việt của font
 Đọc name/head/maxp/cmap của TTF/OTF/TTC/WOFF (cả font ngoài Unity và font trích từ object Font của Unity) và kiểm 134 ký tự Việt có dấu dựng sẵn. Thẻ “Độ phủ tiếng Việt của font” trong view Font, tải `font_metrics.json`. Lưu ý: font nguồn đủ tiếng Việt chưa chắc game hiển thị được (TMP dùng atlas tĩnh). Chưa hỗ trợ WOFF2. Test: `python3 tests/make_fontmetrics_fonts.py DIR && node tests/run_fontmetrics_tests.js DIR` (cần fonttools).
+
+## Cập nhật 0.13.1 (sửa 5.2d theo dữ liệu thật)
+Đọc TMP_FontAsset trên DATA WING: bố cục xác nhận đúng, sửa 2 lỗi (glyph khoảng trắng nằm ngoài atlas; FaceInfo 20 trường) khiến 4/7 asset bị loại. Cần chạy lại trên DATA WING để xác nhận. Test: `python3 tests/make_tmp_ipas.py DIR && node tests/run_tmp_tests.js DIR`.

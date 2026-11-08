@@ -513,7 +513,7 @@ FontMetricsResult (= results.fontMetrics) = { schema:'font_metrics/1', sub_phase
 
 ## NS.TmpFont (js/modules/tmp_font.js) – Worker + luồng chính. Nạp SAU font_metrics.js, TRƯỚC ipa_reader.js (index.html + worker importScripts đã cập nhật)
 ```
-TmpFont.decodeObject(objBytes, littleEndian, ctx?) -> TmpItemCore        // THUẦN, không ném lỗi. ctx={textures,materials,fonts,tmp: Map path_id→tên} (mặc định rỗng)
+TmpFont.decodeObject(objBytes, littleEndian, ctx?) -> TmpItemCore   // 0.13.1: glyph_table.placeholder_glyphs; font_info.atlas_basis ∈ {'faceinfo_layout'(20 trường, THẬT),'faceinfo_layout_18'(dự phòng),'scan'}; diagnostics.best_table_check        // THUẦN, không ném lỗi. ctx={textures,materials,fonts,tmp: Map path_id→tên} (mặc định rỗng)
 TmpFont.decodeFile(bytes, info, objectIndexes, fileRec, res)             // THUẦN: đẩy item vào res.items (dùng nội bộ bởi scan)
 TmpFont.scan(file, ipaResult, entries, {isCancelled?, progress?}) -> Promise<TmpResult>   // chỉ ném CANCELLED; entries = ENTRY GỐC của openZip
 TmpFont.toIndex(res) -> JSON thuần (= tmp_fonts.json); TmpFont.toReportFields(res) -> {tmp_status, tmp_font_assets, tmp_parsed, tmp_not_found, tmp_vi_full, tmp_vi_partial, tmp_vi_none}|null

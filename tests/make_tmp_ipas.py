@@ -56,32 +56,35 @@ def ranges(cps):
     if s is not None: out_.append([s, e])
     return out_
 
-def glyphs(ids, e, aw=1024, ah=1024, bad_index=None, dup=0):
+def glyphs(ids, e, aw=1024, ah=1024, bad_index=None, dup=0, ph_ids=()):
     ids = list(ids)
     for i in range(dup): ids.append(ids[i])
     b = b''
     for i, cp in enumerate(ids):
         x, y, w, h = (i % 30) * 32, (i // 30) * 32 % (ah - 32), 30, 30
         if bad_index == i: x = aw - 5                                # chữ nhật tràn khỏi atlas
+        if cp in ph_ids: x, y, w, h = 4, ah + 3, (0 if cp == 10 else 8.8125), (0 if cp == 10 else 24.625)   # DỮ LIỆU THẬT: glyph vô hình đặt ngoài atlas (y = cao atlas + padding)
         b += struct.pack(e + 'i8f', cp, float(x), float(y), float(w), float(h), 1.5, 24.0, 20.0, 1.0)
     return struct.pack(e + 'i', len(ids)) + b
 
-def faceinfo(name, e, pt=36.0, count=0, aw=1024.0, ah=1024.0):
+def faceinfo(name, e, pt=36.0, count=0, aw=1024.0, ah=1024.0, legacy=False):
     vals = [pt, 1.0]
-    after = [48.0, 36.0, 30.0, 25.0, -9.0, 15.0, 10.0, -10.0, 8.0, -12.0, 3.0, 16.0, 6.0, aw, ah]   # LineHeight … AtlasHeight (15 giá trị)
-    return astr(name.encode(), e) + struct.pack(e + 'ff', *vals) + struct.pack(e + 'i', count) + struct.pack(e + '15f', *after)
+    # BỐ CỤC THẬT (DATA WING): sau CharacterCount có 17 giá trị: LineHeight, Baseline, Ascender, CapHeight, Descender, CenterLine, SuperscriptOffset, SubscriptOffset, SubSize, Underline,
+    # UnderlineThickness, strikethrough, strikethroughThickness, TabWidth, Padding, AtlasWidth, AtlasHeight. Bản `legacy` (15 giá trị, không có 2 trường strikethrough) là giả định cũ.
+    after = [48.0, 36.0, 30.0, 25.0, -9.0, 15.0, 10.0, -10.0, 8.0, -12.0, 3.0] + ([] if legacy else [14.0, 3.0]) + [16.0, 6.0, aw, ah]
+    return astr(name.encode(), e) + struct.pack(e + 'ff', *vals) + struct.pack(e + 'i', count) + struct.pack(e + '%df' % len(after), *after)
 
 def pptr(file_id, pid, e): return struct.pack(e + 'iq', file_id, pid)
 
 def tmp_asset(name, e, script_pid=5, face=None, ids=None, declared=None, atlas_pid=20, mat_pid=30, font_pid=40, fallback_pid=None, bad_index=None, dup=0, aw=1024.0, ah=1024.0,
-              no_glyphs=False, pad=96, pre_ids=None):
+              no_glyphs=False, pad=96, pre_ids=None, legacy_fi=False, ph_ids=()):
     hdr = pptr(0, 0, e) + b'\1\0\0\0' + pptr(0, script_pid, e) + astr(name.encode(), e)
     body = struct.pack(e + 'i', 1)                                   # fontAssetType (giả định)
     if font_pid: body += pptr(0, font_pid, e)                       # tham chiếu Font nguồn (trước FaceInfo)
-    body += faceinfo(face, e, count=declared if declared is not None else len(ids or []), aw=aw, ah=ah)
+    body += faceinfo(face, e, count=declared if declared is not None else len(ids or []), aw=aw, ah=ah, legacy=legacy_fi)
     if atlas_pid: body += pptr(0, atlas_pid, e)
     if pre_ids: body += glyphs(pre_ids, e, aw=int(aw), ah=int(ah))      # bảng glyph thứ hai (hợp lệ) đứng TRƯỚC bảng chính
-    body += (bytes(2000) if no_glyphs else glyphs(ids, e, aw=int(aw), ah=int(ah), bad_index=bad_index, dup=dup))
+    body += (bytes(2000) if no_glyphs else glyphs(ids, e, aw=int(aw), ah=int(ah), bad_index=bad_index, dup=dup, ph_ids=ph_ids))
     if mat_pid: body += pptr(0, mat_pid, e)
     if fallback_pid: body += pptr(0, fallback_pid, e)
     return hdr + body + bytes(pad)
@@ -109,6 +112,9 @@ specs = [
     (111, 'TwoLists-A SDF', dict(face='Two A', ids=sorted(range(105, 205)), pre_ids=sorted(range(65, 105)), declared=100), dict(status='parsed', cps=set(range(105, 205)), face='Two A', declared=100, problem='bảng glyph hợp lệ khác')),
     (112, 'TwoLists-B SDF', dict(face='Two B', ids=sorted(range(105, 205)), pre_ids=sorted(range(65, 105)), declared=40), dict(status='parsed', cps=set(range(65, 105)), face='Two B', declared=40, problem='bảng glyph hợp lệ khác')),
     (113, 'TwoLists-C SDF', dict(face='Two C', ids=sorted(range(105, 205)), pre_ids=sorted(range(65, 105)), declared=77), dict(status='partial', cps=set(range(105, 205)), face='Two C', declared=77, problem='bảng glyph hợp lệ khác')),
+    (120, 'Placeholders SDF', dict(face='Xolonium', ids=sorted(ASCII | LATIN1_ALL | {10, 0x3000}), ph_ids={10, 32, 0xA0, 0x3000}), dict(status='parsed', cps=ASCII | LATIN1_ALL | {10, 0x3000}, face='Xolonium', declared=len(ASCII | LATIN1_ALL | {10, 0x3000}), atlas=(1024, 1024, 'faceinfo_layout'), placeholders=4)),
+    (121, 'TooManyPlaceholders SDF', dict(face='TooMany', ids=sorted(set(range(0, 33)) | set(range(65, 85))), ph_ids=set(range(0, 33))), dict(status='glyph_table_not_found', face='TooMany', declared=53)),
+    (122, 'Legacy18 SDF', dict(face='Legacy18', ids=sorted(ASCII), legacy_fi=True), dict(status='parsed', cps=ASCII, face='Legacy18', declared=len(ASCII), atlas=(1024, 1024, 'faceinfo_layout_18'))),
     (109, 'CJK SDF', dict(face='Noto CJK', ids=sorted(CJK | ASCII), aw=4096.0, ah=4096.0), dict(status='parsed', cps=CJK | ASCII, face='Noto CJK', declared=len(CJK | ASCII), atlas=(4096, 4096, 'faceinfo_layout'))),
 ]
 objs = [O(1, 115, monoscript(*SA, '<'), 3), O(6, 115, monoscript(*SB, '<'), 3), O(20, 28, tex('SourceCodePro Atlas', '<'), 1), O(21, 28, tex('Orbitron Atlas', '<'), 1),
@@ -156,6 +162,22 @@ def unityfs(nodes):
     return head + info + data
 IN_B = build(17, True, TY[:4] + [TY[5]], [O(5, 115, monoscript(*SA, '<'), 3), O(400, 114, tmp_asset('InBundle SDF', '<', script_pid=5, face='Bundled', ids=sorted(ASCII)), 4)], scripts=[(0, 5)])
 FILES['Data/Bundles/b.bundle'] = unityfs([('CAB-1', 4, IN_B)])
+
+# ---- Bản tái dựng từ BYTE THẬT (DATA WING: 'European Chars - Xolonium', 254 ký tự; hex_head + count_hits trong tmp_fonts.json) ----
+REAL_HEAD = ("1a 77 c6 4a 00 00 00 00 1b 00 00 00 00 00 00 00 66 88 63 66 01 00 00 00 08 00 00 00 58 6f 6c 6f 6e 69 75 6d 00 00 b0 41 00 00 80 3f fe 00 00 00 00 00 d4 41 00 00 00 00 00 00 9d 41 "
+             "00 00 68 41 00 00 a0 c0 00 00 00 00 00 00 9d 41 7b 14 3e c0 00 00 00 3f 7b 14 3e c0 c3 f5 a8 3f 8c 2e aa 40 c3 f5 a8 3f 00 40 b0 42 00 00 40 40 00 00 00 44 00 00 80 43 "
+             "00 00 00 00 39 00 00 00 00 00 00 00 fe 00 00 00")
+REAL_SPACE = "20 00 00 00 00 00 80 40 00 80 81 43 00 00 0d 41 00 00 c5 41 00 00 00 00 00 00 9d 41 00 00 0d 41 00 00 80 3f"       # glyph id 32: y = 259 > cao atlas 256
+head = bytes.fromhex(REAL_HEAD.replace(' ', '')); space = bytes.fromhex(REAL_SPACE.replace(' ', '')); assert len(space) == 36
+real_name = 'European Chars - Xolonium'
+real = pptr(0, 0, '<') + b'\1\0\0\0' + pptr(1, 67, '<') + astr(real_name.encode(), '<') + head + space
+real_ids = list(range(33, 286)); assert len(real_ids) == 253
+for i, cp in enumerate(real_ids): real += struct.pack('<i8f', cp, float((i % 24) * 20), float((i // 24) * 22), 12.0 + (i % 5), 21.0, 0.5, 19.6, 13.0 + (i % 4), 1.0)
+real += pptr(0, 31, '<') + bytes(64)
+open(os.path.join(out, 'tmp_real_xolonium.bin'), 'wb').write(real)
+REAL_SET = set(range(32, 286)); rcov = len(VI & REAL_SET)
+EXP['real_xolonium'] = dict(name=real_name, declared=254, count=254, atlas=(512, 256), point_size=22, covered=rcov, missing=134 - rcov, level='partial' if 0 < rcov < 134 else ('full' if rcov == 134 else 'none'), placeholders=1,
+                            script=(1, 67), face='Xolonium', ranges=ranges(REAL_SET))
 
 def info_plist(): return plistlib.dumps({'CFBundleIdentifier': 'com.test.tmp', 'CFBundleName': 'TMP', 'CFBundleExecutable': 'Exe'}, fmt=plistlib.FMT_BINARY)
 def macho(): return struct.pack('<IiiIIIII', 0xFEEDFACF, 0x0100000C, 0, 2, 0, 0, 0, 0) + b'\0' * 64

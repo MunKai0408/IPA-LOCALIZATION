@@ -4,9 +4,9 @@
      1. Header MonoBehaviour (m_GameObject, m_Enabled, m_Script, m_Name) – nếu không khớp thì quét từ đầu object và ghi vấn đề.
      2. Neo FaceInfo: chuỗi tên + PointSize/Scale/CharacterCount hợp lý → tên font nguồn, số ký tự khai báo, kích thước atlas (nếu suy ra được).
      3. Neo bảng glyph: số lượng N (int32) rồi N phần tử 36 byte {id:int32, x,y,width,height,xOffset,yOffset,xAdvance,scale: float32}; CHỈ nhận khi MỌI phần tử hợp lệ
-        (id là code point, số hữu hạn, hình chữ nhật nằm trong atlas nếu biết kích thước, id không trùng) → code point trong atlas.
+        (id là code point, số hữu hạn, hình chữ nhật nằm trong atlas nếu biết kích thước – NGOẠI LỆ: glyph khoảng trắng/điều khiển được TMP đặt ngoài atlas, id không trùng) → code point trong atlas.
      4. Các PPtr khớp object thật trong cùng file (Texture2D, Material, Font, TMP_FontAsset khác) – chỉ là THAM CHIẾU THẤY ĐƯỢC, không khẳng định ý nghĩa trường.
-   Bố cục TMP_Glyph 9 trường/36 byte và FaceInfo là kiến thức về TextMesh Pro (chưa đối chiếu nguồn, chưa kiểm trên file thật): nếu sai, kết quả là `glyph_table_not_found`
+   Bố cục TMP_Glyph 9 trường/36 byte ĐÃ ĐƯỢC XÁC NHẬN trên DỮ LIỆU THẬT của DATA WING (3/7 asset đọc đủ, count khớp khai báo; 4 asset còn lại bị loại oan vì glyph khoảng trắng nằm ngoài atlas và FaceInfo 20 trường – đã sửa ở Account 08, CHƯA chạy lại trên DATA WING). Nếu bố cục khác ở game khác, kết quả là `glyph_table_not_found`
    kèm dữ liệu chẩn đoán (hex), KHÔNG bịa danh sách ký tự. Chạy ở Worker/luồng chính. Chỉ ném CANCELLED. Không giải mã ảnh atlas (Texture2D). */
 (function (root) {
   'use strict';
@@ -57,13 +57,16 @@
   function findFaceInfo(R, ob, from) {
     for (let p = align4(from); p + 8 <= R.len; p += 4) {
       const L = R.i32(p); if (L < 1 || L > 120 || p + 4 + L > R.len || !printable(ob, p + 4, L)) continue;
-      const e = align4(p + 4 + L); if (e + 4 * 18 > R.len) continue;
+      const e = align4(p + 4 + L); if (e + 4 * 20 > R.len) continue;
       const pt = R.f32(e), sc = R.f32(e + 4), cc = R.i32(e + 8), lh = R.f32(e + 12);
       if (!(pt >= 1 && pt <= 4096) || !(sc > 0 && sc <= 64) || cc < 0 || cc > LIMITS.max_glyphs || !(lh > 0 && lh <= 20000)) continue;
       let name = ''; for (let i = 0; i < L; i++) name += String.fromCharCode(ob[p + 4 + i]);
       const info = { offset: p, name: name, point_size: pt, scale: sc, declared_char_count: cc, line_height: lh, atlas_width: null, atlas_height: null, atlas_basis: null };
-      const w = R.f32(e + 4 * 16), h = R.f32(e + 4 * 17);
-      if (isPow2(w) && isPow2(h)) { info.atlas_width = w; info.atlas_height = h; info.atlas_basis = 'faceinfo_layout'; }
+      /* DỮ LIỆU THẬT (DATA WING, TMP cho Unity 5.6): FaceInfo có 20 trường – sau CharacterCount còn LineHeight, Baseline, Ascender, CapHeight, Descender, CenterLine, SuperscriptOffset, SubscriptOffset, SubSize,
+         Underline, UnderlineThickness, strikethrough, strikethroughThickness, TabWidth, Padding, AtlasWidth, AtlasHeight → AtlasWidth/Height ở +72/+76 byte từ PointSize. Bản 18 trường (không có 2 trường strikethrough) là giả định cũ, giữ làm dự phòng. */
+      const w20 = R.f32(e + 4 * 18), h20 = R.f32(e + 4 * 19), w18 = R.f32(e + 4 * 16), h18 = R.f32(e + 4 * 17);
+      if (isPow2(w20) && isPow2(h20)) { info.atlas_width = w20; info.atlas_height = h20; info.atlas_basis = 'faceinfo_layout'; }
+      else if (isPow2(w18) && isPow2(h18)) { info.atlas_width = w18; info.atlas_height = h18; info.atlas_basis = 'faceinfo_layout_18'; }
       else for (let k = 3; k + 1 < 28 && e + 4 * (k + 2) <= R.len; k++) {
         const a = R.f32(e + 4 * k), b = R.f32(e + 4 * (k + 1));
         if (isPow2(a) && isPow2(b) && a >= 64 && b >= 64 && Math.max(a, b) / Math.min(a, b) <= 4) { info.atlas_width = a; info.atlas_height = b; info.atlas_basis = 'scan'; break; }
@@ -74,13 +77,35 @@
   }
 
   /* ---------- 3. Neo bảng glyph ---------- */
-  function glyphAt(R, o, aw, ah) {
-    const id = R.i32(o); if (id < 0 || id > 0x10FFFF) return false;
-    const f = []; for (let k = 0; k < 8; k++) { const v = R.f32(o + 4 + 4 * k); if (!Number.isFinite(v) || Math.abs(v) > 100000) return false; f.push(v); }
+  /** Ký tự khoảng trắng/điều khiển/định dạng: TMP đặt glyph của chúng NGOÀI atlas (DỮ LIỆU THẬT: y = chiều cao atlas + padding, vd y=259 trên atlas cao 256, y=1027 trên atlas cao 1024). */
+  function isInvisibleId(id) {
+    return id <= 0x20 || (id >= 0x7F && id <= 0xA0) || id === 0xAD || id === 0x1680 || (id >= 0x2000 && id <= 0x200F) || (id >= 0x2028 && id <= 0x202F) || (id >= 0x205F && id <= 0x206F) || id === 0x3000 || id === 0xFEFF;
+  }
+  /** @returns 0 = không hợp lệ; 1 = hợp lệ (nằm trong atlas); 2 = hợp lệ nhưng là glyph vô hình đặt ngoài atlas (chỉ chấp nhận cho id khoảng trắng/điều khiển). */
+  function glyphKind(R, o, aw, ah) {
+    const id = R.i32(o); if (id < 0 || id > 0x10FFFF) return 0;
+    const f = []; for (let k = 0; k < 8; k++) { const v = R.f32(o + 4 + 4 * k); if (!Number.isFinite(v) || Math.abs(v) > 100000) return 0; f.push(v); }
     const x = f[0], y = f[1], w = f[2], h = f[3], sc = f[7];
-    if (w < 0 || h < 0 || x < -0.5 || y < -0.5 || !(sc > 0 && sc <= 1000)) return false;
-    if (aw !== null && (x + w > aw + 1 || y + h > ah + 1)) return false;
-    return true;
+    if (w < 0 || h < 0 || x < -0.5 || y < -0.5 || !(sc > 0 && sc <= 1000)) return 0;
+    if (aw !== null && (x + w > aw + 1 || y + h > ah + 1)) return isInvisibleId(id) ? 2 : 0;
+    return 1;
+  }
+  /** CHẨN ĐOÁN: vì sao bảng N phần tử tại p (số nguyên = số ký tự khai báo) bị từ chối: số phần tử vi phạm + phần tử vi phạm đầu tiên. */
+  function tableCheck(R, p, n, aw, ah) {
+    const out = { records: n, fail_count: 0, placeholder_glyphs: 0, first_fail: null };
+    for (let i = 0; i < n; i++) {
+      const o = p + 4 + STRIDE * i, k = glyphKind(R, o, aw, ah);
+      if (k === 2) out.placeholder_glyphs++;
+      if (k !== 0) continue;
+      out.fail_count++;
+      if (!out.first_fail) {
+        const id = R.i32(o), f = []; for (let j = 0; j < 8; j++) f.push(R.f32(o + 4 + 4 * j));
+        const finite = f.every(function (v) { return Number.isFinite(v) && Math.abs(v) <= 100000; });
+        out.first_fail = { index: i, id: id, reason: (id < 0 || id > 0x10FFFF) ? 'id_not_code_point' : !finite ? 'non_finite_or_huge' : (f[2] < 0 || f[3] < 0 || f[0] < -0.5 || f[1] < -0.5 || !(f[7] > 0 && f[7] <= 1000)) ? 'negative_or_bad_scale' : 'outside_atlas',
+          x: finite ? f[0] : null, y: finite ? f[1] : null, width: finite ? f[2] : null, height: finite ? f[3] : null, scale: finite ? f[7] : null };
+      }
+    }
+    return out;
   }
   /** Mọi ứng viên bảng glyph mà TOÀN BỘ phần tử hợp lệ. Chọn: bảng có số phần tử = CharacterCount khai báo (nếu có); không thì bảng LỚN NHẤT. Báo các ứng viên còn lại.
    *  @returns {offset,count,duplicate_ids,others:[{offset,count}]}|null */
@@ -88,12 +113,11 @@
     const cands = [];
     for (let p = align4(from); p + 4 + STRIDE <= R.len; p += 4) {
       const n = R.i32(p); if (n < 1 || n > LIMITS.max_glyphs || p + 4 + STRIDE * n > R.len) continue;
-      if (!glyphAt(R, p + 4, aw, ah)) continue;
-      let ok = true; for (let i = 1; i < n && ok; i++) ok = glyphAt(R, p + 4 + STRIDE * i, aw, ah);
-      if (!ok) continue;
+      let ph = 0, ok = true; for (let i = 0; i < n && ok; i++) { const k = glyphKind(R, p + 4 + STRIDE * i, aw, ah); if (k === 0) ok = false; else if (k === 2) ph++; }
+      if (!ok || ph > Math.max(8, Math.floor(n / 10))) continue;      // glyph vô hình ngoài atlas chỉ là số ít; nhiều hơn → không phải bảng glyph
       const ids = new Set(); let dup = 0; for (let i = 0; i < n; i++) { const id = R.i32(p + 4 + STRIDE * i); if (ids.has(id)) dup++; else ids.add(id); }
       if (dup > Math.max(0, Math.floor(n / 100))) continue;      // TMP dùng từ điển id→glyph: trùng nhiều = không phải bảng glyph
-      cands.push({ offset: p, count: n, duplicate_ids: dup });
+      cands.push({ offset: p, count: n, duplicate_ids: dup, placeholder_glyphs: ph });
     }
     if (!cands.length) return null;
     let pick = declared > 0 ? cands.find(function (c) { return c.count === declared; }) : null;
@@ -149,15 +173,17 @@
       out.status = fi ? 'glyph_table_not_found' : 'layout_unknown';
       out.reason = 'Không thấy bảng glyph 36 byte/phần tử hợp lệ' + (fi ? ' (FaceInfo: ' + fi.name + ', khai báo ' + fi.declared_char_count + ' ký tự)' : '') + '. Bố cục TMP của bản TextMesh Pro này có thể khác giả định; xem diagnostics.';
       if (fi && fi.declared_char_count > 0) {      // giúp suy ra bố cục thật: nơi nào có số nguyên bằng số ký tự khai báo
-        const hits = []; for (let p = align4(start); p + 4 <= R.len && hits.length < LIMITS.max_diag_hits; p += 4) if (R.i32(p) === fi.declared_char_count) hits.push({ offset: p, next_hex: hexHead(p + 4, 48) });
+        const hits = []; for (let p = align4(start); p + 4 <= R.len && hits.length < LIMITS.max_diag_hits; p += 4) if (R.i32(p) === fi.declared_char_count) { const h = { offset: p, next_hex: hexHead(p + 4, 48) }; if (p + 4 + STRIDE * fi.declared_char_count <= R.len) h.table_check = tableCheck(R, p, fi.declared_char_count, fi.atlas_width, fi.atlas_height); hits.push(h); }
         out.diagnostics.count_hits = hits;
+        let best = null; hits.forEach(function (h) { if (h.table_check && (!best || h.table_check.fail_count <= best.table_check.fail_count)) best = h; });
+        if (best) out.diagnostics.best_table_check = Object.assign({ offset: best.offset }, best.table_check);      // ứng viên ÍT vi phạm nhất (thường là bảng thật, không phải trường CharacterCount)
       }
       return out;
     }
     const ids = []; for (let i = 0; i < gt.count; i++) ids.push(R.i32(gt.offset + 4 + STRIDE * i));
     const sample = []; for (let i = 0; i < Math.min(3, gt.count); i++) { const o = gt.offset + 4 + STRIDE * i; sample.push({ id: R.i32(o), x: R.f32(o + 4), y: R.f32(o + 8), width: R.f32(o + 12), height: R.f32(o + 16), x_offset: R.f32(o + 20), y_offset: R.f32(o + 24), x_advance: R.f32(o + 28), scale: R.f32(o + 32) }); }
     const set = new Set(ids), rg = ranges(Array.from(set));
-    out.glyph_table = { offset: gt.offset, stride: STRIDE, count: gt.count, duplicate_ids: gt.duplicate_ids, count_matches_declared: fi ? fi.declared_char_count === gt.count : null, other_tables: gt.others, sample: sample };
+    out.glyph_table = { offset: gt.offset, stride: STRIDE, count: gt.count, duplicate_ids: gt.duplicate_ids, count_matches_declared: fi ? fi.declared_char_count === gt.count : null, placeholder_glyphs: gt.placeholder_glyphs, other_tables: gt.others, sample: sample };
     out.code_points = { count: set.size, ranges: rg.slice(0, LIMITS.max_ranges), ranges_total: rg.length, ranges_truncated: rg.length > LIMITS.max_ranges };
     out.vietnamese = vietnamese(set);
     const skip = gt.offset + 4 + STRIDE * gt.count;

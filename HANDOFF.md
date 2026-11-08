@@ -1,6 +1,44 @@
 # HANDOFF.md
 
-## Phiên hiện tại: Account 07 – SUB-PHASE 5.2d (ĐỌC TMP_FontAsset = “hướng B”) HOÀN THÀNH trên dữ liệu GIẢ LẬP → bàn giao Account 08
+## Phiên hiện tại: Account 08 – SỬA 5.2d THEO DỮ LIỆU THẬT (tmp_fonts.json của DATA WING, bản 0.13.0) → bản 0.13.1 → bàn giao Account 09
+Người dùng gửi `tmp_fonts.json` (kết quả THẬT đầu tiên của 5.2d) cùng zip phiên 07. (Account 08 đã bỏ một bản TMP viết trùng chưa hoàn thành, dùng zip của người dùng làm gốc.)
+Sửa: `js/modules/tmp_font.js` (FaceInfo 20 trường; glyph vô hình ngoài atlas; chẩn đoán `best_table_check`), `tests/make_tmp_ipas.py`, `tests/run_tmp_tests.js` (233 → **297** kiểm tra), `js/app.js` (0.13.1-phase5.2d), INTERFACES/NEXT_TASK/HANDOFF. Không đổi kiến trúc, không sang sub-phase khác.
+
+### Kết quả THẬT của 0.13.0 trên DATA WING (7 TMP_FontAsset, 6 trong resources.assets + 1 trong sharedassets0.assets)
+| Asset | FaceInfo (tên font nguồn, khai báo, atlas) | 0.13.0 | Việt |
+|---|---|---|---|
+| Georgian Chars | Noto Sans Georgian, 33, 128×128 (U+10D0–10F0) | đọc đủ | 0/134 |
+| Korean Chars | Noto Sans CJK JP, 737 (hangul), 512×1024 | đọc đủ | 0/134 |
+| Misc Symbol Chars | Arial Unicode MS, 4 (▒ ○ ● ♫), 128×64 | đọc đủ | 0/134 |
+| Chinese Chars | Noto Sans CJK SC, 1265, 1024×1024 | KHÔNG đọc được | – |
+| Japanese Chars | 03SmartFontUI, 931, 512×1024 | KHÔNG đọc được | – |
+| **European Chars – BitstreamVera + DejaVu** | DejaVu Sans Mono, **254**, 512×256 | KHÔNG đọc được | – |
+| **European Chars – Xolonium** (sharedassets0) | Xolonium, **254**, 512×256 | KHÔNG đọc được | – |
+Header thật: script (file_id 1, path_id 67) ở cả 7 (MonoScript nằm trong file ngoài), enabled=1. 3 asset đọc được có `count_matches_declared: true` → **bố cục TMP_Glyph 36 byte và việc dò neo FaceInfo/bảng glyph ĐÚNG trên dữ liệu thật.**
+
+### Hai nguyên nhân thật khiến 4 asset bị loại (đã sửa, tái dựng từ byte thật)
+1. **Glyph vô hình nằm NGOÀI atlas:** TMP đặt glyph của khoảng trắng/xuống dòng ở y = cao atlas + padding (Xolonium: ký tự 32 có y=259 trên atlas cao 256, rộng 8,8125, cao 24,625; Chinese: id 10 y=1027, w=h=0, trên atlas 1024; Japanese: U+3000 y=1027). Ràng buộc “mọi chữ nhật nằm trong atlas” loại oan cả bảng. Sửa: chấp nhận glyph ngoài atlas CHỈ khi id là khoảng trắng/điều khiển/định dạng (`isInvisibleId`) và tổng số ≤ max(8, 10% bảng); ghi `glyph_table.placeholder_glyphs`. Chữ nhìn thấy tràn atlas vẫn loại cả bảng.
+2. **FaceInfo thật có 20 trường** (sau CharacterCount: LineHeight, Baseline, Ascender, CapHeight, Descender, CenterLine, SuperscriptOffset, SubscriptOffset, SubSize, Underline, UnderlineThickness, **strikethrough, strikethroughThickness**, TabWidth, Padding, AtlasWidth, AtlasHeight); giả định cũ 18 trường nên `atlas_basis` ra `scan`. Sửa: đọc AtlasWidth/Height ở +72/+76 byte tính từ PointSize (`faceinfo_layout`), giữ 18 trường làm dự phòng (`faceinfo_layout_18`), rồi mới quét.
+Cấu trúc object thật (suy từ hex): m_GameObject PPtr (12) · m_Enabled (1+3 đệm) · m_Script PPtr (12) · m_Name (chuỗi căn 4) · 24 byte chưa rõ nghĩa (8 byte + 8 byte + 4 byte + int32=1) · FaceInfo (chuỗi tên + 20 trường) · PPtr atlas Texture2D (fileID 0, pathID, vd 57) · int32 số glyph · N × 36 byte {id, x, y, width, height, xOffset, yOffset, xAdvance, scale}. Module vẫn dò neo, không dựa vị trí cố định.
+
+### Thêm chẩn đoán (để lần sau nếu còn asset lỗi thì thấy ngay nguyên nhân)
+`diagnostics.count_hits[].table_check` và `diagnostics.best_table_check` {offset, records, fail_count, placeholder_glyphs, first_fail:{index,id,reason:'id_not_code_point'|'non_finite_or_huge'|'negative_or_bad_scale'|'outside_atlas',x,y,width,height,scale}} – ứng viên ít vi phạm nhất.
+
+### Kiểm thử đã chạy
+- `node tests/run_tmp_tests.js` **297 đạt**: giữ 233 test cũ + fixture mới: glyph vô hình ngoài atlas (LF/NBSP/U+3000 chấp nhận), quá nhiều glyph vô hình (>10%) bị loại, FaceInfo 18 trường dự phòng, **bản tái dựng từ BYTE THẬT của asset ‘European Chars – Xolonium’** (hex_head + count_hits trong tmp_fonts.json; đáp án tính độc lập bằng Python: 254 glyph, count khớp, 1 glyph vô hình y=259, atlas 512×256, độ phủ Việt `partial`), chẩn đoán `best_table_check`.
+- Mutation: 10 phá hoại (bỏ ngoại lệ, ngoại lệ cho mọi ký tự, bỏ giới hạn glyph vô hình, bỏ FaceInfo 20/18, khoảng trắng 0x20/U+3000 không vô hình, bỏ/sai chẩn đoán…) → đều bị bắt (1 mutation biên độ dài FaceInfo 18↔20 sống sót, vô hại vì bảng glyph vẫn phải khớp).
+- Hồi quy 10 bộ cũ đạt nguyên số lượng: detect 359, scan 112, unity 86, metadata 72, literal 53, tables 314, font 76, unityfs 217, serialized 141, fontmetrics 120.
+**CHƯA kiểm:** 0.13.1 trên DATA WING thật (người dùng cần đưa zip lên GitHub Pages và chạy lại), Chinese/Japanese/DejaVu/Xolonium chưa đọc ra cho tới khi chạy lại; có thể còn vi phạm khác (nếu có, `best_table_check.first_fail` sẽ chỉ ra). Safari iPhone, TMP trong bundle.
+
+### Điều đã biết về game (dùng cho quyết định Việt hóa)
+- **Không có TMP_FontAsset nào dùng Source Code Pro** (7 asset: Noto CJK ×2, 03SmartFontUI, Noto Georgian, Arial Unicode, DejaVu Sans Mono, Xolonium). Giả thuyết “đổi sang Source Code Pro” (trước đó) KHÔNG còn khả thi nếu không tạo TMP atlas mới.
+- Mỗi tập chữ có một TMP_FontAsset riêng (“Chars”): có vẻ là font dự phòng theo hệ chữ. Hai atlas châu Âu chỉ 254 ký tự (DejaVu Sans Mono và Xolonium) – nhiều khả năng ASCII + Latin-1 + một ít Latin mở rộng; con số Việt chính xác sẽ có sau khi chạy lại 0.13.1.
+- Muốn hiển thị tiếng Việt đầy đủ: cần tạo lại atlas (TMP Font Asset Creator trong Unity Editor) cho một font đủ tiếng Việt (Source Code Pro đủ glyph theo `font_metrics.json`, nhưng chưa có atlas), hoặc kiểm game có dynamic fallback. Đây là việc NGOÀI ứng dụng này – cần nói thẳng với người dùng, không hứa.
+- Chưa biết component TextMeshPro nào dùng asset nào (`m_fontAsset`), chưa biết cách game chọn cột ngôn ngữ (enum hay header), chưa biết xử lý Ả Rập/ArabicSupport ảnh hưởng gì.
+
+---
+
+## (Trước đó) Account 07 – SUB-PHASE 5.2d (ĐỌC TMP_FontAsset = “hướng B”) HOÀN THÀNH trên dữ liệu GIẢ LẬP → bàn giao Account 08
 Người dùng đề xuất làm hướng B để biết ATLAS của TMP_FontAsset (đặc biệt Source Code Pro) có đủ ký tự Việt không, rồi mới quyết định có đổi font sang Source Code Pro hay không. Phiên này chỉ làm đúng việc đó.
 Tạo: `js/modules/tmp_font.js` (`NS.TmpFont`), `tests/make_tmp_ipas.py`, `tests/run_tmp_tests.js`. Sửa: `js/modules/serialized_file.js` (CỘNG THÊM: mỗi file ghi `tmp_font_assets` = chỉ số các object MonoBehaviour có script class `TMP_FontAsset`; 141 test cũ vẫn đạt), `js/ipa_reader.js` (bước 13 `tmp`), `js/state.js`, `js/workers/ipa.worker.js`, `index.html`, `js/events.js`, `js/ui.js` (thẻ “TMP_FontAsset – ký tự trong atlas” trong view Font + nút `#btn-tmp-json`), `js/app.js` (0.13.0-phase5.2d), INTERFACES/NEXT_TASK/HANDOFF/README.
 

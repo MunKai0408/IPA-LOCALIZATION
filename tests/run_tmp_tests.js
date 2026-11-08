@@ -120,5 +120,26 @@ const hexs = function (a) { return a.map(function (c) { return 'U+' + c.toString
   ok(small.warnings.some(function (w) { return /vượt giới hạn/.test(w); }), 'file quá lớn → cảnh báo, không đọc');
   ok(r.tmp_fonts.items.every(function (i) { return i.source; }), 'mọi item có nguồn');
 
+  { const oa = by['OutOfAtlas SDF'].diagnostics.best_table_check; ok(oa && oa.records === 100 && oa.fail_count === 1 && oa.first_fail.index === 50 && oa.first_fail.reason === 'outside_atlas' && oa.first_fail.id === 115, 'chẩn đoán: glyph vi phạm đầu tiên (index 50, id 115, outside_atlas): ' + JSON.stringify(oa)); }
+  { const tm = by['TooManyPlaceholders SDF'].diagnostics.best_table_check; ok(tm && tm.fail_count === 0 && tm.placeholder_glyphs === 33, 'chẩn đoán: bảng bị loại vì quá nhiều glyph vô hình (33), không có glyph vi phạm'); }
+  /* 9. DỮ LIỆU THẬT của DATA WING (Account 08): glyph khoảng trắng nằm ngoài atlas + FaceInfo 20 trường */
+  Object.keys(EXP.assets).forEach(function (name) {
+    const ex = EXP.assets[name], it = by[name]; if (!it || !it.glyph_table) return;
+    ok(it.glyph_table.placeholder_glyphs === (ex.placeholders || 0), name + ': placeholder_glyphs=' + it.glyph_table.placeholder_glyphs + ' (mong ' + (ex.placeholders || 0) + ')');
+  });
+  ok(by['Placeholders SDF'].status === 'parsed' && by['Placeholders SDF'].code_points.ranges.some(function (rg) { return rg[0] <= 10 && rg[1] >= 10; }) && by['Placeholders SDF'].code_points.ranges.some(function (rg) { return rg[0] <= 0x3000 && rg[1] >= 0x3000; }), 'glyph vô hình (LF, U+3000) ngoài atlas được nhận và tính vào code point');
+  ok(by['OutOfAtlas SDF'].status === 'glyph_table_not_found', 'chữ NHÌN THẤY tràn atlas vẫn bị loại cả bảng (ngoại lệ chỉ cho khoảng trắng/điều khiển)');
+  ok(by['TooManyPlaceholders SDF'].status === 'glyph_table_not_found', 'quá nhiều glyph "vô hình" ngoài atlas (>10%) → không nhận là bảng glyph');
+  ok(by['Legacy18 SDF'].font_info.atlas_basis === 'faceinfo_layout_18' && by['SourceCodePro SDF'].font_info.atlas_basis === 'faceinfo_layout', 'FaceInfo 20 trường (thật) và 18 trường (dự phòng) đều đọc đúng kích thước atlas');
+  { const R = EXP.real_xolonium, ob = new Uint8Array(fs.readFileSync(path.join(dir, 'tmp_real_xolonium.bin'))), d = NS.TmpFont.decodeObject(ob, true);
+    ok(d.status === 'parsed' && d.name === R.name, 'bản tái dựng từ byte THẬT (Xolonium): status=' + d.status + ' ' + d.reason);
+    ok(d.header && d.header.script_file_id === R.script[0] && d.header.script_path_id === R.script[1] && d.header.enabled === 1, 'header thật: script (file 1, path 67), enabled=1');
+    ok(d.font_info && d.font_info.name === R.face && d.font_info.point_size === R.point_size && d.font_info.declared_char_count === R.declared && d.font_info.atlas_width === R.atlas[0] && d.font_info.atlas_height === R.atlas[1] && d.font_info.atlas_basis === 'faceinfo_layout', 'FaceInfo thật: ' + JSON.stringify(d.font_info && [d.font_info.name, d.font_info.point_size, d.font_info.declared_char_count, d.font_info.atlas_width, d.font_info.atlas_height, d.font_info.atlas_basis]));
+    ok(d.glyph_table && d.glyph_table.count === R.count && d.glyph_table.count_matches_declared === true && d.glyph_table.placeholder_glyphs === R.placeholders && d.glyph_table.duplicate_ids === 0, 'bảng glyph thật: count khớp khai báo, 1 glyph vô hình (khoảng trắng y=259 > 256)');
+    ok(d.glyph_table && d.glyph_table.sample[0].id === 32 && d.glyph_table.sample[0].y === 259 && d.glyph_table.sample[0].width === 8.8125 && d.glyph_table.sample[0].scale === 1, 'glyph đầu = khoảng trắng đúng giá trị byte thật (x=4, y=259, w=8.8125, h=24.625)');
+    ok(JSON.stringify(d.code_points.ranges) === JSON.stringify(R.ranges) && d.vietnamese.covered === R.covered && d.vietnamese.missing_count === R.missing && d.vietnamese.level === R.level && d.problems.length === 0, 'độ phủ Việt khớp Python: ' + d.vietnamese.covered + '/134 ' + d.vietnamese.level + ' ' + JSON.stringify(d.problems));
+    ok(d.vietnamese.level === 'partial' && d.vietnamese.covered > 0 && d.vietnamese.covered < 134, 'asset kiểu Latin (254 ký tự) KHÔNG đủ tiếng Việt – không bị báo đủ');
+    ok(d.refs && d.refs.texture.length === 0, 'refs không bịa khi ctx rỗng');
+  }
   console.log(fail ? '\n' + fail + ' KIỂM TRA THẤT BẠI / ' + n : '\nTẤT CẢ ĐẠT (' + n + ' kiểm tra)'); process.exit(fail ? 1 : 0);
 })().catch(function (e) { console.error('Lỗi test:', e); process.exit(2); });
