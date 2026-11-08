@@ -17,6 +17,7 @@
     { id: 'unityfs',  label: 'AssetBundle UnityFS (container)' },
     { id: 'serialized', label: 'SerializedFile (TextAsset, font, script)' },
     { id: 'fontmetrics', label: 'Metadata font & độ phủ tiếng Việt' },
+    { id: 'tmp',      label: 'TMP_FontAsset (atlas ký tự)' },
     { id: 'report',   label: 'Tạo báo cáo' },
     { id: 'package',  label: 'Đóng gói ZIP' }
   ];

@@ -506,3 +506,40 @@ FontMetricsResult (= results.fontMetrics) = { schema:'font_metrics/1', sub_phase
 
 ## Chưa tồn tại (đừng gọi)
 Đọc TMP_FontAsset (atlas, bảng ký tự, font nguồn), WOFF2, kiểm dấu rời/GSUB, ghi family/glyph vào `fonts.json`, xuất ZIP (Phase 9), parser/công cụ dịch bảng chuỗi CSV (Phase 6).
+
+
+---
+# Bổ sung Phase 5 – SUB-PHASE 5.2d TMP_FontAsset (Account 07)
+
+## NS.TmpFont (js/modules/tmp_font.js) – Worker + luồng chính. Nạp SAU font_metrics.js, TRƯỚC ipa_reader.js (index.html + worker importScripts đã cập nhật)
+```
+TmpFont.decodeObject(objBytes, littleEndian, ctx?) -> TmpItemCore        // THUẦN, không ném lỗi. ctx={textures,materials,fonts,tmp: Map path_id→tên} (mặc định rỗng)
+TmpFont.decodeFile(bytes, info, objectIndexes, fileRec, res)             // THUẦN: đẩy item vào res.items (dùng nội bộ bởi scan)
+TmpFont.scan(file, ipaResult, entries, {isCancelled?, progress?}) -> Promise<TmpResult>   // chỉ ném CANCELLED; entries = ENTRY GỐC của openZip
+TmpFont.toIndex(res) -> JSON thuần (= tmp_fonts.json); TmpFont.toReportFields(res) -> {tmp_status, tmp_font_assets, tmp_parsed, tmp_not_found, tmp_vi_full, tmp_vi_partial, tmp_vi_none}|null
+TmpFont.LIMITS = {max_assets:200, max_asset_bytes:64MiB, max_file_bytes:256MiB, max_glyphs:70000, max_ranges:5000, max_listed_missing:150, hex_head_bytes:192, max_refs:8, max_diag_hits:6}; STRIDE=36; SCHEMA='tmp_fonts/1'; NOT_DONE[5]; VI_REQUIRED (134 code point, bằng FontMetrics.VI_REQUIRED)
+```
+```
+TmpResult = { schema:'tmp_fonts/1', sub_phase:'5.2d', status:'ok'|'partial'|'none_parsed'|'no_tmp'|'error'|'not_run', reason, items:TmpItem[], summary:{assets,parsed,partial,not_found,other,by_status{},vietnamese_full,vietnamese_partial,vietnamese_none}|null, limits, limitations[5], warnings[] }
+TmpItem = { id, file_id, source(đường dẫn file .assets), object_index, path_id, size, name(m_Name),
+  status:'parsed'|'partial'|'glyph_table_not_found'|'layout_unknown'|'too_large'|'error', reason, problems[],
+  header:{script_file_id, script_path_id, enabled}|null,
+  font_info:{name, point_size, scale, declared_char_count, line_height, atlas_width, atlas_height, atlas_basis:'faceinfo_layout'|'scan'|null, offset}|null,
+  glyph_table:{offset, stride:36, count, duplicate_ids, count_matches_declared:true|false|null, other_tables:[{offset,count}], sample:[{id,x,y,width,height,x_offset,y_offset,x_advance,scale}×≤3]}|null,
+  code_points:{count, ranges:[[s,e]], ranges_total, ranges_truncated}|null,
+  vietnamese:{level:'full'|'partial'|'none', required:134, covered, missing_count, missing:['U+1EF9'…≤150], percent, ascii_letters_ok, ascii_missing[]}|null,
+  refs:{texture:[{path_id,name,offset}], material:[], font:[], tmp_font_asset:[]}|null,   // PPtr (fileID=0) khớp object thật trong cùng file; KHÔNG khẳng định ý nghĩa trường
+  matched_fonts:[{path_id,name,basis}],                                                  // Font cùng tên với FaceInfo.name (đối chiếu tên, không phải tham chiếu)
+  diagnostics:{object_size,data_start,faceinfo_offset,hex_head,stride,count_hits?:[{offset,next_hex}]} }
+```
+**Ngữ nghĩa/quyết định:** `parsed` = có bảng glyph hợp lệ VÀ (nếu có FaceInfo) số phần tử = CharacterCount; `partial` = có bảng nhưng lệch khai báo hoặc không có FaceInfo; không tìm được bảng → `glyph_table_not_found`/`layout_unknown`, `vietnamese=null` (KHÔNG suy diễn). `vietnamese.level` chỉ nói ATLAS có glyph cho 134 chữ Việt dựng sẵn; ‘full’ chỉ khi thiếu 0 ký tự. Bảng glyph: nhận khi MỌI phần tử hợp lệ (id 0..0x10FFFF, số hữu hạn |v|≤1e5, width/height≥0, x/y≥-0.5, 0<scale≤1000, x+width≤AtlasWidth+1 và y+height≤AtlasHeight+1 nếu biết, id trùng ≤1%); nhiều bảng hợp lệ → chọn bảng có count = CharacterCount, nếu không có thì lớn nhất. Header MonoBehaviour giả định: m_GameObject PPtr(12) + m_Enabled(1)+pad + m_Script PPtr(12) + m_Name (chuỗi căn 4); không khớp → quét từ đầu object và ghi `problems`. int64 (path_id) đọc theo endian của file. Chỉ xử lý file có `source:'file'`; TMP trong node bundle → cảnh báo.
+**Rủi ro #1 (chưa kiểm trên TextMesh Pro thật):** bố cục TMP_Glyph 36 byte và FaceInfo (xem HANDOFF.md).
+
+## Thay đổi ở module cũ (5.2d)
+- `SerializedFile.scan`: mỗi mục `files[]` có thể có `tmp_font_assets: number[]` (chỉ số object MonoBehaviour mà script resolve ra class `TMP_FontAsset`, ≤5000). Cộng thêm, không đổi trường cũ.
+- `IpaReader.analyze`: bước 13 `tmp` (sau `fontmetrics`): `IpaResult.tmp_fonts: TmpResult|null`; `skipped` khi `no_tmp`/`not_run`; lỗi chỉ thành cảnh báo; hủy → CANCELLED. `State.PIPELINE_STEPS` thêm `{id:'tmp', label:'TMP_FontAsset (atlas ký tự)'}` sau `fontmetrics`.
+- `Events.applyResult`: `session.results.tmpFonts`; nút `#btn-tmp-json` tải `tmp_fonts.json`.
+- UI: `buildTmpCard` trong view `fonts` (hiện cả khi không có file font/metrics); `renderFonts` cache theo `fonts`, `fontMetrics`, `tmpFonts`. Bảng đặt cột “Tiếng Việt” ngay sau tên asset. `NS.VERSION='0.13.0-phase5.2d'`.
+
+## Chưa tồn tại (đừng gọi)
+Giải mã Texture2D atlas, liên kết component TextMeshPro → TMP_FontAsset, TMP trong node bundle, kerning/fallback/material, ghi ngược/tạo lại atlas, gộp TMP vào `fonts.json`/ZIP (Phase 9).

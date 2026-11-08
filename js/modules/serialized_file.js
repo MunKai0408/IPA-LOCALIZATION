@@ -230,6 +230,7 @@
       ctx.mbRefs.forEach(function (m) {
         m.refs.forEach(function (cnt, key) {
           const sc = ctx.scripts.get(key), nm = sc ? (sc.namespace ? sc.namespace + '.' : '') + sc.class_name : null;
+          if (sc && sc.class_name === 'TMP_FontAsset' && m.objs.get(key)) { m.item.tmp_font_assets = (m.item.tmp_font_assets || []).concat(m.objs.get(key)).slice(0, 5000); }
           if (nm) { classes[nm] = (classes[nm] || 0) + cnt; resolved += cnt; m.item.monobehaviours[nm] = (m.item.monobehaviours[nm] || 0) + cnt; } else { unresolved += cnt; m.item.monobehaviours['(không xác định)'] = (m.item.monobehaviours['(không xác định)'] || 0) + cnt; }
         });
       });
@@ -268,15 +269,16 @@
   function fillInfo(it, info, ctx, res, srcKey) {
     it.status = 'parsed'; it.reason = info.reason; it.version = info.header.version; it.endian = info.header.endian; it.unity_version = info.unity_version; it.target_platform = info.target_platform; it.enable_type_tree = info.enable_type_tree;
     it.type_count = info.types.length; it.object_count = info.objects.length; it.classes = info.class_counts; it.externals = info.externals.map(function (e) { return e.path; }); it.script_count = info.scripts.length; it.problems = info.problems.slice();
-    const key = baseOf(srcKey).toLowerCase(), refs = new Map();
+    const key = baseOf(srcKey).toLowerCase(), refs = new Map(), objs = new Map();
     info.objects.forEach(function (o) {
       if (o.class_id !== 114) return;
       const idx = info.header.version >= 17 ? (info.types[o.type_index] ? info.types[o.type_index].script_type_index : -1) : o.script_type_index, sc = idx >= 0 ? info.scripts[idx] : null;
       let k = 'unknown#' + o.index;
       if (sc && sc.path_id !== 0) { const fk = sc.file_index === 0 ? key : (info.externals[sc.file_index - 1] ? baseOf(info.externals[sc.file_index - 1].path).toLowerCase() : '?'); k = fk + '#' + sc.path_id; }
       refs.set(k, (refs.get(k) || 0) + 1);
+      if (!objs.has(k)) objs.set(k, []); objs.get(k).push(o.index);   // chỉ số object theo script (5.2d dùng để tìm TMP_FontAsset)
     });
-    if (refs.size) ctx.mbRefs.push({ item: it, refs: refs });
+    if (refs.size) ctx.mbRefs.push({ item: it, refs: refs, objs: objs });
   }
 
   function processBytes(bytes, it, ctx, res, out, srcKey, full, info0) {

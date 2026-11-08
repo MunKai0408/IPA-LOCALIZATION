@@ -103,6 +103,12 @@ Công cụ chỉ phân tích tĩnh. Trình duyệt không thể đọc RAM hay h
 
 Không dùng. ZIP được đọc bằng parser tự viết + `DecompressionStream('deflate-raw')` của trình duyệt (Safari 16.4+, Chrome 80+, Firefox 113+).
 
+## Cập nhật 0.13.0 (Phase 5, sub-phase 5.2d): đọc TMP_FontAsset (atlas ký tự)
+
+Trong view **Font** có thêm thẻ **“TMP_FontAsset – ký tự trong atlas”**: với mỗi TMP_FontAsset (TextMesh Pro) tìm thấy trong file `.assets` của game Unity, bảng cho biết atlas chứa bao nhiêu ký tự và đủ bao nhiêu trong 134 chữ Việt có dấu dựng sẵn (cột “Tiếng Việt” nằm ngay sau tên asset). Nút **Tải tmp_fonts.json** lưu kết quả đầy đủ.
+Lưu ý: bố cục TextMesh Pro được đọc theo giả định và CHƯA kiểm trên game thật. Nếu thẻ báo “Không thấy bảng glyph”, đó là kết quả trung thực (không đoán): hãy gửi `tmp_fonts.json` cho người phát triển. “Đủ” nghĩa là atlas có glyph, chưa chứng minh game dùng asset đó cho chữ hiển thị.
+Kiểm thử (giả lập): `python3 tests/make_tmp_ipas.py /tmp/fake_ipas && node tests/run_tmp_tests.js /tmp/fake_ipas`.
+
 ## Cập nhật 0.10.0 (Phase 5, sub-phase 5.2a): parser UnityFS (container)
 Đọc header, bảng block/node của AssetBundle UnityFS (LZ4/LZ4HC/LZMA/không nén), liệt kê node và giải nén được nội dung từng node (`NS.UnityFS.readNode`). Thẻ “AssetBundle UnityFS” nằm trong view Unity / Metadata; tải `unityfs_index.json`. **Chưa** parse SerializedFile nên chưa biết bên trong có TextAsset/Font/TMP hay không. Mới kiểm bằng bundle giả lập, chưa kiểm bundle Unity thật. Test: `python3 tests/make_unityfs_ipas.py DIR && node tests/run_unityfs_tests.js DIR`.
 

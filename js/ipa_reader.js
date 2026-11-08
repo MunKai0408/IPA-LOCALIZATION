@@ -572,6 +572,24 @@
       warn('Đọc metadata font thất bại: ' + ((e && e.message) || e));
       step('fontmetrics', 'error', (e && e.message) || 'Lỗi');
     }
+
+    /* --- Bước 13: TMP_FontAsset (Phase 5, sub-phase 5.2d): đọc lại CHỈ các file .assets có TMP_FontAsset (5.2c đã đánh dấu). Heuristic có kiểm chứng; lỗi chỉ thành cảnh báo. --- */
+    step('tmp', 'running', 'Đọc TMP_FontAsset (bảng ký tự atlas)');
+    try {
+      if (!NS.TmpFont) throw new IpaError('NO_TMP_MODULE', 'Thiếu module tmp_font.js');
+      const tr = await NS.TmpFont.scan(file, result, entries, { isCancelled: cancelled });
+      result.tmp_fonts = tr; const ts = tr.summary || {};
+      if (tr.status === 'no_tmp' || tr.status === 'not_run') { log('INFO', 'TMP_FontAsset: ' + tr.reason); step('tmp', 'skipped', 'Không có TMP_FontAsset'); }
+      else {
+        log(tr.status === 'ok' ? 'SUCCESS' : 'WARNING', 'TMP_FontAsset: ' + tr.status + ' – ' + tr.reason, ts);
+        tr.warnings.forEach(function (w) { warn(w); });
+        step('tmp', tr.status === 'error' ? 'error' : 'done', (ts.parsed || 0) + '/' + (ts.assets || 0) + ' đọc được · tiếng Việt: ' + (ts.vietnamese_full || 0) + ' đủ, ' + (ts.vietnamese_partial || 0) + ' thiếu, ' + (ts.vietnamese_none || 0) + ' không');
+      }
+    } catch (e) {
+      if (e && e.code === 'CANCELLED') throw e;
+      warn('Đọc TMP_FontAsset thất bại: ' + ((e && e.message) || e));
+      step('tmp', 'error', (e && e.message) || 'Lỗi');
+    }
     progress(1);
     return result;
   }
