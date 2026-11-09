@@ -17,6 +17,16 @@ const run = async function (name) {
   const rows = []; const sc = R.createScanner(function (r) { rows.push(r); }); const b = new TextEncoder().encode('xx Tiếp tục hành trình xx'); sc.feed(b.subarray(0, 8)); sc.feed(b.subarray(8)); sc.end();
   ok(rows.length === 1 && rows[0].text.indexOf('Tiếp tục hành trình') >= 0, 'scanner: ghép đúng qua ranh giới chunk (UTF-8 đa byte)');
 
+  /* CDB: chỉ lấy cột localizable, gồm sheet con */
+  const cdbS = JSON.stringify({ sheets: [
+    { name: 'item', columns: [{ name: 'id' }, { name: 'name', kind: 'localizable' }, { name: 'tags' }, { name: 'events' }], lines: [{ id: 'Sword', name: 'Kiếm sắt', tags: [{ tag: 'HasBullets' }], events: [{ text: 'Hello there, traveler', fxId: 'fxKnifeA' }] }] },
+    { name: 'item@events', columns: [{ name: 'text', kind: 'localizable' }, { name: 'fxId' }], lines: [] }] });
+  const cr = NS.TextExtract.parseCdb(cdbS);
+  ok(cr && cr.rows.length === 2 && cr.rows[0].key === 'item[Sword].name' && cr.rows[1].key === 'item[Sword].events[0].text' && cr.rows[1].text === 'Hello there, traveler', 'CDB: chỉ cột localizable (gồm sheet con), bỏ ID/tag/fx');
+  ok(NS.TextExtract.extractBytes('data.cdb', new TextEncoder().encode(cdbS)).format === 'cdb-localizable', 'extractBytes: .cdb → cdb-localizable');
+  const jx = NS.TextExtract.extractBytes('a.json', new TextEncoder().encode('{"bone":"toesLeftB","t":"Hello world, again."}'));
+  ok(jx.rows.length === 1 && jx.rows[0].text === 'Hello world, again.', 'JSON thường: bỏ ID 1 từ');
+
   let r = await run('raw_pak'); const t = r.texts, tx = t.rows.map(function (x) { return x.text; });
   ok(r.pak_heads.pak_files[0].heaps.status !== 'ok', 'pak header lạ → không đọc được cây (unverified/partial)');
   ok(tx.indexOf('Press any button to continue the game.') >= 0, 'raw: chuỗi UTF-8 trần');

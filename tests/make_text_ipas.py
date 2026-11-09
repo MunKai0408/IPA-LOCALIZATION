@@ -35,7 +35,7 @@ strings = '/* c */\n"hello" = "Xin chào %@!";\n"quit" = "Quit\\nGame";\n"empty"
 sdict = plistlib.dumps({'items': {'NSStringLocalizedFormatKey': '%#@n@', 'n': {'NSStringFormatSpecTypeKey': 'NSStringPluralRuleType', 'NSStringFormatValueTypeKey': 'd', 'one': '%d item', 'other': '%d items'}}}, fmt=plistlib.FMT_XML)
 xcs = json.dumps({'sourceLanguage': 'en', 'strings': {'Play': {'localizations': {'en': {'stringUnit': {'state': 'translated', 'value': 'Play'}}, 'vi': {'stringUnit': {'state': 'translated', 'value': 'Chơi'}}}}}}).encode()
 pak_files = [('lang/en.xml', b'<l><t id="hi">Hello %s &amp; welcome</t><t id="bye">Goodbye</t></l>'), ('lang/fr.xml', '<l><t id="hi">Bonjour %s</t></l>'.encode()),
-             ('data.cdb', json.dumps({'sheets': [{'name': 'items', 'lines': [{'id': 'Sword', 'name': 'Sword of doom'}]}]}).encode()),
+             ('data.cdb', json.dumps({'sheets': [{'name': 'items', 'columns': [{'name': 'id'}, {'name': 'name', 'kind': 'localizable'}], 'lines': [{'id': 'Sword', 'name': 'Sword of doom'}]}]}).encode()),
              ('fonts/main.ttf', ttf), ('fonts/bad.ttf', b'NOTAFONT' * 4), ('img/a.png', b'\x89PNG' + b'0' * 20)]
 CASES = {
   'text_ios': {'en.lproj/Localizable.strings': strings, 'vi.lproj/Localizable.stringsdict': sdict, 'Localizable.xcstrings': xcs,

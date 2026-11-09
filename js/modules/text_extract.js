@@ -111,6 +111,28 @@
     })(j, '', 0);
     return { rows: rows, bad: 0 };
   }
+  /** CastleDB (.cdb): chỉ lấy các cột có kind="localizable" (game tự đánh dấu cột cần dịch), kể cả sheet con "cha@cột". Trả null nếu không phải CDB. */
+  function parseCdb(s) {
+    let j; try { j = JSON.parse(s); } catch (_) { return null; }
+    if (!j || !Array.isArray(j.sheets)) return null;
+    const by = {}; j.sheets.forEach(function (sh) { if (sh && sh.name) by[sh.name] = sh; });
+    const rows = []; let nCols = 0;
+    function locCols(sh) { const m = {}; (sh.columns || []).forEach(function (c) { if (c && c.name) { m[c.name] = c.kind === 'localizable'; } }); return m; }
+    function walkLine(sh, line, prefix, depth) {
+      if (!line || typeof line !== 'object' || depth > 8 || rows.length >= LIMITS.max_rows) return;
+      const lc = locCols(sh);
+      (sh.columns || []).forEach(function (c) {
+        if (!c || !c.name) return; const v = line[c.name];
+        if (lc[c.name]) { nCols++; if (typeof v === 'string' && v !== '') rows.push({ key: prefix + '.' + c.name, text: v, ctx: 'CDB localizable' }); return; }
+        if (Array.isArray(v)) { const sub = by[sh.name + '@' + c.name]; if (sub) v.forEach(function (x, i) { walkLine(sub, x, prefix + '.' + c.name + '[' + (x && x.id ? x.id : i) + ']', depth + 1); }); }
+      });
+    }
+    j.sheets.forEach(function (sh) {
+      if (!sh || !sh.name || sh.name.indexOf('@') >= 0 || !Array.isArray(sh.lines)) return;
+      sh.lines.forEach(function (line, i) { walkLine(sh, line, sh.name + '[' + (line && line.id ? line.id : i) + ']', 0); });
+    });
+    return { rows: rows, bad: 0 };
+  }
   function splitCsv(s, delim) {
     const out = []; let row = [], cell = '', q = false;
     for (let i = 0; i < s.length; i++) {
@@ -195,7 +217,8 @@
     if (ext === 'strings') r = parseStringsText(s);
     else if (ext === 'stringsdict') r = parsePlistDict(new TextEncoder().encode(s), 'dict');
     else if (ext === 'xcstrings') r = parseXcstrings(s);
-    else if (ext === 'json' || ext === 'cdb') { r = parseJsonWalk(s); if (!r) return { skip: 'JSON không hợp lệ' }; }
+    else if (ext === 'cdb' && (r = parseCdb(s))) { fmt = 'cdb-localizable'; }
+    else if (ext === 'json' || ext === 'cdb') { r = parseJsonWalk(s); if (!r) return { skip: 'JSON không hợp lệ' }; r.rows = r.rows.filter(function (x) { return confidence(x.text) === 'high'; }); } // JSON thường: bỏ ID/tên 1 từ
     else if (ext === 'csv') r = parseCsv(s, ',');
     else if (ext === 'tsv') r = parseCsv(s, '\t');
     else if (ext === 'po' || ext === 'pot') r = parsePo(s);
@@ -312,11 +335,12 @@
 
     /* (3) DỰ PHÒNG MỌI ENGINE: quét chuỗi thô các container chưa có trình đọc (pak không rõ cấu trúc, .bin/.dat/.obb/.assets…). [HYPOTHESIS] */
     if (opts.rawFallback !== false && NS.RawStrings) {
+      const okPaks = new Set(((result && result.pak_heads && result.pak_heads.pak_files) || []).filter(function (p) { return p.heaps && p.heaps.status === 'ok'; }).map(function (p) { return p.zip_path; }));
       const unsup = new Set(out.unsupported.map(function (u) { return u.file; }));
       const done = new Set(out.files.filter(function (f) { return f.container === 'ipa'; }).map(function (f) { return f.file; }));
       const rc = entries.filter(function (e) {
         if (e.dir || e.unsafe || e.encrypted || (e.method !== 0 && e.method !== 8) || e.size < 256 || e.size > LIMITS.raw_file_bytes) return false;
-        if (/(^|\/)(_codesignature|sc_info)\//i.test(e.name) || /(^|\/)frameworks\//i.test(e.name) || done.has(e.name)) return false;
+        if (/(^|\/)(_codesignature|sc_info)\//i.test(e.name) || /(^|\/)frameworks\//i.test(e.name) || done.has(e.name) || okPaks.has(e.name)) return false;   // pak đã đọc được cây → không quét thô nữa
         return unsup.has(e.name) || !!RAW_EXT[extOf(e.name)];
       }).sort(function (a, b) { return (unsup.has(b.name) ? 1 : 0) - (unsup.has(a.name) ? 1 : 0) || b.size - a.size; }).slice(0, LIMITS.raw_max_files);
       let rawBytes = 0; out.raw = [];
@@ -359,6 +383,6 @@
   }
   function fontFiles(r) { return (r._fontBlobs || []).slice(); }
 
-  NS.TextExtract = { SCHEMA: SCHEMA, LIMITS: LIMITS, run: run, extractBytes: extractBytes, parseStringsText: parseStringsText, parseXml: parseXml, parsePo: parsePo, parseCsv: parseCsv,
+  NS.TextExtract = { SCHEMA: SCHEMA, LIMITS: LIMITS, run: run, extractBytes: extractBytes, parseCdb: parseCdb, parseStringsText: parseStringsText, parseXml: parseXml, parsePo: parsePo, parseCsv: parseCsv,
     placeholders: placeholders, confidence: confidence, fontMagic: fontMagic, toCsv: toCsv, toIndex: toIndex, fontFiles: fontFiles };
 })(typeof window !== 'undefined' ? window : self);

@@ -51,3 +51,9 @@
 - Log Dead Cells thật (extractor_4): bytes 12..75 của mọi pak = chuỗi hex ASCII 64 ký tự giống nhau ("f5fecf6d…15a1", dạng hash). Quét thô chạy được: 4653 dòng / 5 pak / ~60 s.
 - THÊM: parseHeapsPak tự bỏ qua dải hex rồi thử cây ở start = hx, hx+1, hx+2, hx+4 (csum 4/0, gốc có/không tên); `hex_prefix`, `data_marker_at_header_size`; probe thêm 96 byte sau dải hex + 16 byte cuối header. Test pak 23→24.
 - [HYPOTHESIS]: CHƯA biết cây thật có khớp không. Nếu vẫn unverified: gửi `probe.bytes_after_hex_hex` từ log mới.
+
+
+## v0.16.2-cdb
+- texts.csv Dead Cells thật: cây res4.pak ĐỌC ĐƯỢC (v0.16.1 hex-prefix đúng) → data.cdb (CastleDB, nguồn tiếng Pháp), anims/*.json, cinematics/*.kf.json. JSON walker cũ ra 51k dòng, ~95% là ID/tên anim.
+- THÊM parseCdb: chỉ cột kind="localizable" (cả sheet con cha@cột), key dạng `item[Id].col`; JSON thường chỉ giữ confidence 'high'; pak đã đọc được cây thì KHÔNG quét thô nữa. Tests: raw 15→18, text 31 (sửa 2 ca theo hành vi mới).
+- CHƯA biết: file lang (en/…) nằm ở đâu — chưa thấy trong CSV; res.pak–res3.pak không có text (cần log mới để xác nhận trạng thái cây).

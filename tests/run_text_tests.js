@@ -33,7 +33,7 @@ const rowsOf = function (t, f) { return t.rows.filter(function (x) { return x.fi
   const sd = rowsOf(t, 'vi.lproj/Localizable.stringsdict');
   ok(sd.length === 3 && sd.every(function (x) { return x.lang === 'vi'; }) && !sd.some(function (x) { return /NSStringFormat/.test(x.text); }), 'stringsdict: 3 chuỗi (format key + one + other), không lẫn khóa kỹ thuật');
   const xc = rowsOf(t, 'Localizable.xcstrings'); ok(xc.length === 2 && xc.some(function (x) { return x.lang === 'vi' && x.text === 'Chơi'; }), 'xcstrings: en + vi');
-  const js = rowsOf(t, 'en.json'); ok(js.length === 2 && js.some(function (x) { return x.confidence === 'low'; }) && !js.some(function (x) { return x.text === '5'; }), 'json: 2 dòng, ID=low, số bị bỏ');
+  const js = rowsOf(t, 'en.json'); ok(js.length === 1 && js[0].text === 'Start the game', 'json: chỉ giữ text thật; ID (btn_start_01) và số bị bỏ');
   const cv = rowsOf(t, 'dialog.csv'); ok(cv.some(function (x) { return x.text === 'Hello, world' && x.lang === 'en'; }) && cv.some(function (x) { return x.text === 'Tam biet' && x.lang === 'vi'; }), 'csv: lang theo tên cột');
   const po = rowsOf(t, 'vi.po'); ok(po.length === 2 && po.some(function (x) { return x.key === 'menu|Quit'; }), 'po: msgctxt|msgid');
   ok(rowsOf(t, 'strings.xml')[0].key === 'resources/string[app]', 'android strings.xml');

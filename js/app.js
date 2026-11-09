@@ -1,7 +1,7 @@
 /* app.js – điểm khởi động. Phải nạp SAU logger, state, ui, events. */
 (function (NS) {
   'use strict';
-  NS.VERSION = '0.16.1-hexprefix';
+  NS.VERSION = '0.16.2-cdb';
 
   function boot() {
     let theme = 'dark';
