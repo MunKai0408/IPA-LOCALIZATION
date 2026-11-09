@@ -45,3 +45,9 @@
 - Tích hợp text_extract bước (3); giới hạn: 1100 MB/file, 2500 MB tổng, 40 file. Test: tests/make_raw_ipas.py + tests/run_raw_tests.js (15 ca, GIẢ LẬP). Dữ liệu ngẫu nhiên 2 MB → ~3 dòng rác.
 - [HYPOTHESIS]: bỏ sót text nén/mã hóa/UTF-16 không-Latin; có thể lẫn rác. CHƯA chạy trên Dead Cells thật.
 - Chưa làm: ghi ngược (patch) theo offset, UTF-16 CJK, quét thô executable.
+
+
+## v0.16.1-hexprefix
+- Log Dead Cells thật (extractor_4): bytes 12..75 của mọi pak = chuỗi hex ASCII 64 ký tự giống nhau ("f5fecf6d…15a1", dạng hash). Quét thô chạy được: 4653 dòng / 5 pak / ~60 s.
+- THÊM: parseHeapsPak tự bỏ qua dải hex rồi thử cây ở start = hx, hx+1, hx+2, hx+4 (csum 4/0, gốc có/không tên); `hex_prefix`, `data_marker_at_header_size`; probe thêm 96 byte sau dải hex + 16 byte cuối header. Test pak 23→24.
+- [HYPOTHESIS]: CHƯA biết cây thật có khớp không. Nếu vẫn unverified: gửi `probe.bytes_after_hex_hex` từ log mới.

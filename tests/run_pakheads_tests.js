@@ -64,6 +64,16 @@ const run = async function (name) {
     const z = P.parseHeapsPak(g, 250);
     ok(z.status === 'unverified' && z.header_probe && z.header_probe.entropy_bits_per_byte > 7 && /^[0-9a-f ]+$/.test(z.header_probe.bytes_12_76_hex), 'header rác → unverified + header_probe (entropy cao)');
   })();
+  /* hash hex ASCII 64 ký tự sau header 12 byte (kiểu Dead Cells 3.5.9) → cây bắt đầu sau dải hex */
+  (function () {
+    const nm = function (t) { return Array.from(Buffer.from(t)); };
+    const u32 = function (v) { return [v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >> 24) & 255]; };
+    const hexs = nm('f5fecf6d9ce61936fbea78af097efc1280eaace02d8099036c01f595848215a1');
+    const tree = [0, 1].concat(u32(1), [8], nm('lang.xml'), [0], u32(0), u32(5), u32(0));
+    const hs = 12 + hexs.length + tree.length, b = new Uint8Array([0x50, 0x41, 0x4b, 1].concat(u32(hs), u32(5), hexs, tree, nm('DATA'), [1, 2, 3, 4, 5]));
+    const q = P.parseHeapsPak(b, b.length);
+    ok(q.status === 'ok' && q.hex_prefix.length === 64 && q.layout.tree_start === 76 && q.sample_paths[0] === 'lang.xml' && q.data_marker_at_header_size === 'DATA', 'cây sau dải hex 64 ký tự được nhận');
+  })();
   /* pak nén deflate + header dài hơn head → đọc lại đủ header (partial → ok) */
   const small = new File([fs.readFileSync(path.join(dir, 'text_pak.ipa'))], 't.ipa');
   const rr = await NS.IpaReader.analyze(small, {}, { step() {}, progress() {}, log() {}, isCancelled: undefined });

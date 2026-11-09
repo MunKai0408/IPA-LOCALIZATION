@@ -60,7 +60,8 @@
     const n = Math.max(0, Math.min(head.length, headerSize || head.length) - 12), cnt = new Array(256).fill(0); let pr = 0;
     for (let i = 12; i < 12 + n; i++) { cnt[head[i]]++; if (head[i] >= 32 && head[i] < 127) pr++; }
     let ent = 0; for (let b = 0; b < 256; b++) if (cnt[b]) { const q = cnt[b] / n; ent -= q * Math.log2(q); }
-    return { bytes_12_76_hex: hex(head.subarray(12, 76), 64), sampled_bytes: n, entropy_bits_per_byte: n ? Math.round(ent * 100) / 100 : null, printable_ratio: n ? Math.round(pr / n * 100) / 100 : null,
+    let hx = 12; while (hx < head.length && /[0-9a-fA-F]/.test(String.fromCharCode(head[hx]))) hx++;
+    return { hex_prefix_len: hx - 12, bytes_after_hex_hex: hex(head.subarray(hx, hx + 96), 96), bytes_before_header_end_hex: hex(head.subarray(Math.max(0, (headerSize || 0) - 16), headerSize || 0), 16), data_marker_at_header_size: headerSize && headerSize + 4 <= head.length ? ascii(head, headerSize, 4) : null, bytes_12_76_hex: hex(head.subarray(12, 76), 64), sampled_bytes: n, entropy_bits_per_byte: n ? Math.round(ent * 100) / 100 : null, printable_ratio: n ? Math.round(pr / n * 100) / 100 : null,
       interpretation: !n ? 'không đủ dữ liệu' : ent > 7.5 ? '[HYPOTHESIS] entropy cao: header có thể bị nén/mã hóa/xáo trộn' : ent < 5 ? '[HYPOTHESIS] entropy thấp: cấu trúc thô, có thể là cây với bố cục khác' : '[HYPOTHESIS] entropy trung bình: chưa kết luận' };
   }
 
@@ -79,6 +80,11 @@
     const LAYOUTS = [{ csum: 4, rootNamed: true }, { csum: 4, rootNamed: false }, { csum: 0, rootNamed: true }, { csum: 0, rootNamed: false }, { csum: 8, rootNamed: true }, { csum: 8, rootNamed: false }, { csum: 16, rootNamed: true }, { csum: 32, rootNamed: true },
       /* [HYPOTHESIS] pak Dead Cells thật có 4 byte lạ ngay sau header 12 byte (log: 66 35 66 65 ở mọi pak) → thử cây bắt đầu ở offset 16 */
       { csum: 4, rootNamed: true, start: 16 }, { csum: 4, rootNamed: false, start: 16 }, { csum: 0, rootNamed: true, start: 16 }, { csum: 0, rootNamed: false, start: 16 }];
+    /* [HYPOTHESIS] Dead Cells 3.5.9 thật (log): sau header 12 byte là chuỗi hex ASCII 64 ký tự (giống nhau ở mọi pak, dạng hash) → cây bắt đầu SAU dải hex này. */
+    let hx = 12; while (hx < head.length && /[0-9a-fA-F]/.test(String.fromCharCode(head[hx]))) hx++;
+    out.hex_prefix = hx - 12 >= 32 ? { length: hx - 12, ascii: ascii(head, 12, Math.min(hx - 12, 128)) } : null;
+    if (out.hex_prefix) { const dyn = []; [hx, hx + 1, hx + 2, hx + 4].forEach(function (st) { [4, 0].forEach(function (cs) { [true, false].forEach(function (rn) { dyn.push({ csum: cs, rootNamed: rn, start: st }); }); }); }); Array.prototype.unshift.apply(LAYOUTS, dyn); }
+    out.data_marker_at_header_size = at(out.header_size);
     let best = null, bestLay = null, dataStart = null; const tried = [];
     for (let i = 0; i < LAYOUTS.length; i++) {
       const w = walkTree(head, dv, LAYOUTS[i].csum, LAYOUTS[i].rootNamed, LAYOUTS[i].start);
