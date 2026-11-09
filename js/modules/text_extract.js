@@ -10,9 +10,10 @@
 
   const SCHEMA = 'texts/1';
   const LIMITS = { max_file_bytes: 8 * 1048576, max_files: 3000, max_rows: 300000, max_text_len: 20000, max_font_bytes: 6 * 1048576, max_font_total: 48 * 1048576, max_pak_target_bytes: 160 * 1048576,
-    raw_file_bytes: 1100 * 1048576, raw_total_bytes: 2500 * 1048576, raw_max_files: 40 };
+    raw_file_bytes: 1100 * 1048576, raw_total_bytes: 2500 * 1048576, raw_max_files: 40, pack_total: 256 * 1048576 };
   const RAW_EXT = { pak: 1, pck: 1, bin: 1, dat: 1, data: 1, obb: 1, assets: 1, bundle: 1, unity3d: 1, bytes: 1, res: 1, arc: 1, pkg: 1, wad: 1, lua: 1, luac: 1, jsc: 1, js: 1, db: 1, sqlite: 1, bank: 1, resource: 1, resS: 1, mpq: 1, vfs: 1, big: 1, rpa: 1, rgss3a: 1, dll: 1, hl: 1, lang: 1, loc: 1, msg: 1, bd: 1, cfg: 1, ini: 1, dict: 1, lng: 1 };
   const TEXT_EXT = { strings: 1, stringsdict: 1, xcstrings: 1, json: 1, cdb: 1, csv: 1, tsv: 1, po: 1, pot: 1, xml: 1, properties: 1, txt: 1 };
+  const IMG_EXT = { png: 1, tga: 1, dds: 1, jpg: 1, jpeg: 1, webp: 1, pvr: 1, ktx: 1 };
   const FONT_EXT = { ttf: 'ttf', otf: 'otf', ttc: 'ttc', woff: 'woff', woff2: 'woff2', fnt: 'bmfont' };
   const SKIP_RE = /(^|\/)(frameworks|_codesignature|sc_info|plugins|watch)\//i;
   const NOISE_RE = /(^|\/)(info\.plist|coderesources|privacyinfo\.xcprivacy|gamecontrollerdb\.txt|readme\.txt|ipastore?|ipa\.store|googleservice-info\.plist)$/i;
@@ -35,12 +36,13 @@
   }
   const HAS_LETTER = /\p{L}/u;
   function confidence(t) {
-    if (!HAS_LETTER.test(t)) return null;                                   // số/ký hiệu thuần → bỏ
+    if (!HAS_LETTER.test(t)) return null;
+    if (/\.(png|jpe?g|webp|tga|dds|atlas|wav|ogg|mp3|caf|m4a|json|ase|aseprite|psd|ttf|otf)$/i.test(t)) return null;   // tên file tài nguyên, không phải text hiển thị                                   // số/ký hiệu thuần → bỏ
     if (/\s/.test(t) || /[^\x00-\x7f]/.test(t) || /[.!?…:]$/.test(t)) return 'high';
     if (/^[\w.\-\/\\:#@]+$/.test(t) && (/[_\/\\]|\.[a-z0-9]{2,4}$/i.test(t) || /^[a-z0-9]+([A-Z][a-z0-9]*)+$/.test(t) || /^[A-Z0-9_]+$/.test(t))) return 'low'; // giống ID/đường dẫn
     return 'medium';
   }
-  const PH_RE = /%(?:\d+\$)?[-+ 0#]*\d*(?:\.\d+)?(?:l{0,2}[dioxXufeEgGcs@]|@)|%%|\{\d+\}|\{[A-Za-z_]\w*\}|<\/?[A-Za-z][^>]*>|\\n/g;
+  const PH_RE = /::[+-]?[A-Za-z_]\w*::|\{(?=[^{}]*@\w+\})|@\w+\}|%(?:\d+\$)?[-+0#]*\d*(?:\.\d+)?(?:l{0,2}[dioxXufeEgGcs@]|@)|%%|\{\d+\}|\{[A-Za-z_]\w*\}|<\/?[A-Za-z][^>]*>|\\n/g;
   function placeholders(t) { const m = t.match(PH_RE); return m ? Array.from(new Set(m)) : []; }
 
   /* ---------- parser thuần (text → [{key,text,lang?}]) ---------- */
@@ -261,11 +263,12 @@
     opts = opts || {};
     const IR = NS.IpaReader, cancelled = opts.isCancelled || function () { return false; };
     const chk = function () { if (cancelled()) { const e = new Error('Đã hủy'); e.code = 'CANCELLED'; throw e; } };
-    const out = { schema: SCHEMA, status: 'no_text', reason: 'Không trích được text', rows: [], files: [], skipped: [], unsupported: [], warnings: [], pak_fonts: [], summary: null,
+    const out = { schema: SCHEMA, status: 'no_text', reason: 'Không trích được text', rows: [], files: [], font_inventory: [], skipped: [], unsupported: [], warnings: [], pak_fonts: [], summary: null,
       limitations: ['Chỉ trích text ở định dạng mở/đọc được tĩnh. Unity (I2/TextAsset/bundle), Unreal locres/pak, Cocos/Godot pck, dữ liệu mã hóa/nén riêng: CHƯA có trình đọc riêng (xem unsupported) – nhưng được quét chuỗi thô dự phòng (format \'raw\', [HYPOTHESIS]).',
         'Mỗi dòng là text có trong file (nội dung), nhưng việc game có HIỂN THỊ nó hay không là [HYPOTHESIS] – chưa qua Cổng 0, chưa canary.',
         'Cấu trúc pak Heaps đọc theo giả thuyết; nếu danh sách file hợp lệ nhưng nội dung không giải mã được thì bị bỏ qua và ghi vào skipped.'] };
-    let nFiles = 0;
+    let nFiles = 0; out._src = []; let srcTotal = 0;
+    const keep = function (name, container, path, data, format, extra) { if (srcTotal + data.length > LIMITS.pack_total) { if (!out._srcCapped) { out._srcCapped = true; out.warnings.push('Gói dịch đạt giới hạn ' + Math.round(LIMITS.pack_total / 1048576) + ' MB; một số file không được đưa vào gói.'); } return; } srcTotal += data.length; out._src.push(Object.assign({ name: name, container: container, path: path, data: data, format: format }, extra || {})); };
     const addRows = function (container, path, ex, lang0) {
       const fl = { container: container, file: path, format: ex.format, rows: 0, bad: ex.bad || 0, enc: ex.enc, lang: lang0 };
       const seen = new Set();
@@ -294,7 +297,7 @@
         const r = await IR.readEntry(file, e, { max: LIMITS.max_file_bytes });
         const ex = extractBytes(e.name, r.data);
         if (ex.skip) { out.skipped.push({ container: 'ipa', file: e.name, reason: ex.skip }); continue; }
-        nFiles++; addRows('ipa', e.name, ex, langOfPath(e.name));
+        nFiles++; addRows('ipa', e.name, ex, langOfPath(e.name)); keep('ipa/' + e.name, 'ipa', e.name, r.data, ex.format);
       } catch (err) { if (err && err.code === 'CANCELLED') throw err; out.skipped.push({ container: 'ipa', file: e.name, reason: (err && err.message) || String(err) }); }
     }
 
@@ -305,12 +308,15 @@
       if (!hp || hp.status !== 'ok' || !hp._files) { if (pk.format_guess && pk.format_guess !== 'heaps_pak') out.unsupported.push({ file: pk.zip_path, reason: 'pak định dạng ' + pk.format_guess + ' – chưa có trình đọc' }); else if (hp) out.unsupported.push({ file: pk.zip_path, reason: 'cây pak chưa xác minh (' + hp.status + '): ' + hp.notes.join(' ') }); continue; }
       const ent = entries.find(function (e) { return e.name === pk.zip_path; }); if (!ent) continue;
       const targets = []; let budget = 0;
+      const stems = new Set(); hp._files.forEach(function (f) { if (extOf(f.path) === 'fnt') stems.add(f.path.replace(/\.[^.\/]+$/, '')); });
       hp._files.forEach(function (f) {
         const x = extOf(f.path), isT = TEXT_EXT[x] && !(x === 'txt' && !LOC_RE.test(f.path)), isF = FONT_EXT[x];
-        if (!isT && !isF) return;
-        if (f.size === 0 || f.size > (isF ? LIMITS.max_font_bytes : LIMITS.max_file_bytes)) { if (f.size) out.skipped.push({ container: 'pak:' + pk.zip_path, file: f.path, reason: 'lớn hơn giới hạn' }); return; }
+        const isAux = !isT && !isF && IMG_EXT[x] && (stems.has(f.path.replace(/\.[^.\/]+$/, '')) || /(^|[\/_.-])(fonts?|glyphs?|charset)([\/_.-]|$)/i.test(f.path));   // atlas ảnh của font bitmap
+        if (isF || isAux) out.font_inventory.push({ container: 'pak:' + pk.zip_path, path: f.path, size: f.size, ext: x, role: isAux ? 'bitmap-atlas (ảnh)' : (x === 'fnt' ? 'bitmap-font-desc' : 'font-file') });
+        if (!isT && !isF && !isAux) return;
+        if (f.size === 0 || f.size > ((isF || isAux) ? LIMITS.max_font_bytes : LIMITS.max_file_bytes)) { if (f.size) out.skipped.push({ container: 'pak:' + pk.zip_path, file: f.path, reason: 'lớn hơn giới hạn' }); return; }
         if (budget + f.size > LIMITS.max_pak_target_bytes) return;
-        budget += f.size; targets.push({ start: hp.data_start + f.pos, end: hp.data_start + f.pos + f.size, path: f.path, font: !!isF });
+        budget += f.size; targets.push({ start: hp.data_start + f.pos, end: hp.data_start + f.pos + f.size, path: f.path, font: !!isF, aux: !!isAux });
       });
       if (!targets.length) continue;
       targets.sort(function (a, b) { return a.start - b.start; });
@@ -319,7 +325,9 @@
         let okText = 0, failText = 0;
         targets.forEach(function (t, j) {
           const b = bufs[j], c = 'pak:' + pk.zip_path;
+          if (t.aux) { keep('pak/' + pk.zip_path.replace(/^.*\//, '') + '/' + t.path, c, t.path, b, 'font-atlas-image', { pak: pk.zip_path, pak_data_offset: t.start, pak_entry_size: b.length }); return; }
           if (t.font) {
+            if (fontMagic(b)) keep('pak/' + pk.zip_path.replace(/^.*\//, '') + '/' + t.path, c, t.path, b, 'font-' + fontMagic(b), { pak: pk.zip_path, pak_data_offset: t.start, pak_entry_size: b.length });
             const fm = fontMagic(b), kind = fm || 'không nhận ra magic';
             out.pak_fonts.push({ container: c, file: t.path, size: b.length, magic: fm, ok: !!fm });
             if (fm && fontTotal + b.length <= LIMITS.max_font_total) { fontTotal += b.length; out._fontBlobs.push({ name: c.replace(/[:\/]/g, '_') + '__' + t.path.replace(/\//g, '__'), data: b }); }
@@ -327,7 +335,7 @@
           }
           const ex = extractBytes(t.path, b);
           if (ex.skip) { failText++; out.skipped.push({ container: c, file: t.path, reason: ex.skip }); return; }
-          okText++; nFiles++; addRows(c, t.path, ex, langOfPath(t.path));
+          okText++; nFiles++; addRows(c, t.path, ex, langOfPath(t.path)); keep('pak/' + pk.zip_path.replace(/^.*\//, '') + '/' + t.path, c, t.path, b, ex.format, { pak: pk.zip_path, pak_data_offset: t.start, pak_entry_size: b.length });
         });
         if (failText > 0 && okText === 0) out.warnings.push('Pak ' + pk.zip_path + ': MỌI file text đều không giải mã được → bố cục pak (offset dữ liệu) có thể sai, hoặc nội dung nén/mã hóa riêng.');
       } catch (err) { if (err && err.code === 'CANCELLED') throw err; out.warnings.push('Không đọc được nội dung pak ' + pk.zip_path + ': ' + ((err && err.message) || err)); }
@@ -373,16 +381,39 @@
     return out;
   }
 
+  /** Gói dịch: file GỐC (đúng đường dẫn) + manifest.json + texts.csv + HUONG_DAN.txt. Trả mảng {name,data}. */
+  function toPack(r, meta) {
+    meta = meta || {}; const enc = new TextEncoder(), files = [];
+    const sha = function (u8) { try { const h = NS.Hash.create('sha256'); h.update(u8); return h.hex(); } catch (_) { return null; } };
+    const man = { schema: 'translation_pack/1', ipa: meta.ipa || null, bundleId: meta.bundleId || null, version: meta.version || null, engine: meta.engine || null, created: new Date().toISOString(),
+      note: 'Dịch NỘI DUNG text; GIỮ NGUYÊN tên file, đường dẫn, cấu trúc, ID/khóa, placeholder (::x::, {x@XX}, %s, {0}, <tag>). Trả lại file cùng tên.',
+      files: (r._src || []).map(function (f) { return { file: f.name, container: f.container, path: f.path, format: f.format, size: f.data.length, sha256: sha(f.data), pak: f.pak || null, pak_data_offset: f.pak_data_offset === undefined ? null : f.pak_data_offset }; }),
+      font_inventory: r.font_inventory || [],
+      not_exported: (r.raw || []).map(function (x) { return { file: x.file, reason: 'định dạng chưa có trình đọc – chỉ có dòng text quét thô trong texts.csv (có offset)', rows: x.rows }; }) };
+    (r._src || []).forEach(function (f) { files.push({ name: 'translation_pack/' + f.name, data: f.data }); });
+    files.push({ name: 'translation_pack/manifest.json', data: enc.encode(JSON.stringify(man, null, 2)) });
+    files.push({ name: 'translation_pack/texts.csv', data: enc.encode(toCsv(r)) });
+    files.push({ name: 'translation_pack/HUONG_DAN.txt', data: enc.encode(
+      'GÓI DỊCH – ' + (meta.bundleId || '') + '\r\n' +
+      '1. Dịch text trong các file thư mục ipa/ và pak/. KHÔNG đổi tên file, KHÔNG đổi cấu trúc.\r\n' +
+      '2. File .cdb (CastleDB): chỉ dịch giá trị của các cột có kind="localizable"; giữ nguyên id, tag, đường dẫn tài nguyên.\r\n' +
+      '3. Giữ nguyên mọi placeholder: ::prct::, ::+power::, {Từ@XX}, %s, %d, {0}, <b>…</b>, \\n.\r\n' +
+      '4. texts.csv chỉ để tham khảo (cột key cho biết vị trí chuỗi trong file).\r\n' +
+      '5. Trả lại các file đã dịch cùng tên + cùng thư mục con (ipa/… và pak/…).\r\n' +
+      '6. File font/atlas (manifest.font_inventory) KHÔNG dịch: dùng để dựng font tiếng Việt thay thế.\r\n') });
+    return files;
+  }
+
   function toCsv(r) {
     const lines = [CSV_COLS.join(',')];
     r.rows.forEach(function (x) { lines.push([x.container, x.file, x.format, x.lang, x.key, x.text, x.confidence, x.placeholders.join(' '), x.context].map(csvEscape).join(',')); });
     return '\uFEFF' + lines.join('\r\n') + '\r\n';
   }
   function toIndex(r) {
-    return { raw: r.raw || [], schema: SCHEMA, status: r.status, reason: r.reason, summary: r.summary, files: r.files, skipped: r.skipped, unsupported: r.unsupported, pak_fonts: r.pak_fonts, warnings: r.warnings, limitations: r.limitations };
+    return { raw: r.raw || [], font_inventory: r.font_inventory || [], schema: SCHEMA, status: r.status, reason: r.reason, summary: r.summary, files: r.files, skipped: r.skipped, unsupported: r.unsupported, pak_fonts: r.pak_fonts, warnings: r.warnings, limitations: r.limitations };
   }
   function fontFiles(r) { return (r._fontBlobs || []).slice(); }
 
   NS.TextExtract = { SCHEMA: SCHEMA, LIMITS: LIMITS, run: run, extractBytes: extractBytes, parseCdb: parseCdb, parseStringsText: parseStringsText, parseXml: parseXml, parsePo: parsePo, parseCsv: parseCsv,
-    placeholders: placeholders, confidence: confidence, fontMagic: fontMagic, toCsv: toCsv, toIndex: toIndex, fontFiles: fontFiles };
+    placeholders: placeholders, confidence: confidence, fontMagic: fontMagic, toCsv: toCsv, toPack: toPack, toIndex: toIndex, fontFiles: fontFiles };
 })(typeof window !== 'undefined' ? window : self);

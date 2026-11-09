@@ -37,6 +37,7 @@ xcs = json.dumps({'sourceLanguage': 'en', 'strings': {'Play': {'localizations': 
 pak_files = [('lang/en.xml', b'<l><t id="hi">Hello %s &amp; welcome</t><t id="bye">Goodbye</t></l>'), ('lang/fr.xml', '<l><t id="hi">Bonjour %s</t></l>'.encode()),
              ('data.cdb', json.dumps({'sheets': [{'name': 'items', 'columns': [{'name': 'id'}, {'name': 'name', 'kind': 'localizable'}], 'lines': [{'id': 'Sword', 'name': 'Sword of doom'}]}]}).encode()),
              ('fonts/main.ttf', ttf), ('fonts/bad.ttf', b'NOTAFONT' * 4), ('img/a.png', b'\x89PNG' + b'0' * 20)]
+font_pak_files = [('ui/big.fnt', b'info face="Big" size=16\ncommon lineHeight=18\n'), ('ui/big.png', b'\x89PNG' + b'1' * 30), ('ui/other.png', b'\x89PNG' + b'2' * 30), ('gfx/font_small.png', b'\x89PNG' + b'3' * 30), ('lang/en.xml', b'<l><t id="a">Hello there</t></l>')]
 CASES = {
   'text_ios': {'en.lproj/Localizable.strings': strings, 'vi.lproj/Localizable.stringsdict': sdict, 'Localizable.xcstrings': xcs,
                'Data/Localization/en.json': json.dumps({'ui': {'start': 'Start the game', 'id': 'btn_start_01', 'n': 5}}).encode(),
@@ -44,6 +45,7 @@ CASES = {
                'translations/vi.po': b'msgid ""\nmsgstr ""\n\nmsgctxt "menu"\nmsgid "Quit"\nmsgstr "Tho\\u00e1t"\n\nmsgid "Save"\nmsgstr "L\xc6\xb0u"\n',
                'values/strings.xml': b'<resources><string name="app">My Game</string></resources>',
                'bad/lang.json': b'{not json', 'Frameworks/X.framework/lang.json': b'{"a":"Should be skipped"}'},
+  'font_pak': {'res.pak': heaps(font_pak_files)},
   'text_pak': {'res.pak': heaps(pak_files)},   # lưu DEFLATE (như IPA thật: pak bị nén)
   'text_pak_wrong': {'res.pak': b'PAK\x00' + struct.pack('<II', 40, 10) + ent('', [ent('lang', [ent('en.xml', size=10, pos=0)])]) + b'DATA' + b'\xff\xfe\x00\x01' * 10},
 }

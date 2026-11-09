@@ -62,5 +62,28 @@ const rowsOf = function (t, f) { return t.rows.filter(function (x) { return x.fi
   /* pak không phải Heaps → unsupported */
   r = await run('pak_godot'); ok(r.texts.unsupported.length === 1, 'pak Godot → unsupported');
   r = await run('pak_none'); ok(r.texts.status === 'no_text', 'không có text → no_text');
+  /* gói dịch: file gốc đúng đường dẫn + manifest + csv + hướng dẫn; byte gốc khớp sha256 */
+  await (async function () {
+    t = (await run('text_pak')).texts;
+    const pk = T.toPack(t, { ipa: 'x.ipa', bundleId: 'com.test.game', engine: 'heaps' }), nm = pk.map(function (f) { return f.name; });
+    ok(nm.indexOf('translation_pack/manifest.json') >= 0 && nm.indexOf('translation_pack/texts.csv') >= 0 && nm.indexOf('translation_pack/HUONG_DAN.txt') >= 0, 'gói dịch: có manifest + csv + hướng dẫn');
+    ok(nm.some(function (x) { return x === 'translation_pack/pak/res.pak/lang/en.xml'; }), 'gói dịch: file trong pak đúng đường dẫn: ' + nm.join(','));
+    const man = JSON.parse(Buffer.from(pk.find(function (f) { return f.name.endsWith('manifest.json'); }).data).toString('utf8'));
+    const mf = man.files.find(function (f) { return f.path === 'lang/en.xml'; }), data = pk.find(function (f) { return f.name === 'translation_pack/' + mf.file; }).data;
+    ok(mf.size === data.length && mf.pak && mf.pak_data_offset > 0 && /^[0-9a-f]{64}$/.test(mf.sha256), 'gói dịch: manifest ghi pak + offset + sha256');
+    ok(/Hello %s/.test(Buffer.from(data).toString('utf8')), 'gói dịch: nội dung gốc nguyên vẹn');
+    ok(JSON.stringify(T.toIndex(t)).indexOf('translation_pack') < 0, 'toIndex không chứa byte gói');
+  })();
+
+  /* font bitmap: liệt kê .fnt + atlas cùng tên / tên có "font", vào gói dịch; ảnh thường không lẫn */
+  await (async function () {
+    const fr = (await run('font_pak')).texts, inv = fr.font_inventory.map(function (f) { return f.path; }).sort();
+    ok(inv.join() === 'gfx/font_small.png,ui/big.fnt,ui/big.png', 'font_inventory: fnt + atlas cùng tên + atlas tên font, không có other.png: ' + inv.join());
+    const pk = T.toPack(fr, {}).map(function (f) { return f.name; });
+    ok(pk.indexOf('translation_pack/pak/res.pak/ui/big.png') >= 0 && pk.indexOf('translation_pack/pak/res.pak/ui/big.fnt') >= 0 && pk.indexOf('translation_pack/pak/res.pak/ui/other.png') < 0, 'gói dịch: có fnt + atlas, không có ảnh thường');
+    const man = JSON.parse(Buffer.from(T.toPack(fr, {}).find(function (f) { return f.name.endsWith('manifest.json'); }).data).toString('utf8'));
+    ok(man.font_inventory.length === 3 && T.toIndex(fr).font_inventory.length === 3, 'manifest + index có font_inventory');
+  })();
+
   console.log(fail ? 'FAILED ' + fail + '/' + n : 'PASS ' + n + '/' + n); process.exit(fail ? 1 : 0);
 })();

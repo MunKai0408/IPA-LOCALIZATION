@@ -194,6 +194,13 @@
       const c = S.get().session.results.candidates; if (!c) { UI.toast('Chưa có kết quả hệ ứng viên', 'warning'); return; }
       dl('candidates.json', JSON.stringify(NS.Candidates.toIndex(c), null, 2), 'application/json;charset=utf-8');
     });
+    $('#btn-pack-zip').addEventListener('click', function () {
+      const sn = S.get(), t = sn.session.results.texts;
+      if (!t || !t._src || !t._src.length) { UI.toast('Chưa có file nào để đưa vào gói dịch', 'warning'); return; }
+      const a = sn.session.results.ipa && sn.session.results.ipa.app || {}, eg = sn.session.results.engine;
+      const files = NS.TextExtract.toPack(t, { ipa: sn.session.file && sn.session.file.name || null, bundleId: a.bundleId, version: a.version, engine: eg ? eg.engine : null });
+      dl('translation_pack.zip', NS.PakHeads.buildZip(files), 'application/zip');
+    });
     $('#btn-texts-csv').addEventListener('click', function () {
       const t = S.get().session.results.texts; if (!t || !t.rows.length) { UI.toast('Chưa có text trích xuất', 'warning'); return; }
       dl('texts.csv', NS.TextExtract.toCsv(t), 'text/csv;charset=utf-8');

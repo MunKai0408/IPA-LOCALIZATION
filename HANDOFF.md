@@ -57,3 +57,19 @@
 - texts.csv Dead Cells thật: cây res4.pak ĐỌC ĐƯỢC (v0.16.1 hex-prefix đúng) → data.cdb (CastleDB, nguồn tiếng Pháp), anims/*.json, cinematics/*.kf.json. JSON walker cũ ra 51k dòng, ~95% là ID/tên anim.
 - THÊM parseCdb: chỉ cột kind="localizable" (cả sheet con cha@cột), key dạng `item[Id].col`; JSON thường chỉ giữ confidence 'high'; pak đã đọc được cây thì KHÔNG quét thô nữa. Tests: raw 15→18, text 31 (sửa 2 ca theo hành vi mới).
 - CHƯA biết: file lang (en/…) nằm ở đâu — chưa thấy trong CSV; res.pak–res3.pak không có text (cần log mới để xác nhận trạng thái cây).
+
+
+## v0.16.3-filter
+- texts_2.csv (v0.16.2): 4671 dòng; data.cdb → cdb-localizable 3192 dòng text thật (nguồn Pháp, vài dòng Anh). Còn ~1450 dòng rác từ kf.json (features[].name/backed_image = tên file ảnh).
+- THÊM: loại chuỗi kết thúc bằng đuôi file tài nguyên; placeholder Dead Cells `::x::`, `{từ@XX}`; bỏ cờ khoảng trắng của printf (tránh bắt nhầm "% dégâts"). Test raw 18→20.
+- Việc tiếp: đóng gói bản dịch ngược vào pak (cần tên + vị trí file – đã có).
+
+
+## v0.17.0-pack
+- THÊM nút "Tải gói dịch (zip)": translation_pack.zip = file GỐC cần dịch đúng đường dẫn (ipa/<đường dẫn> và pak/<tên pak>/<đường dẫn>) + manifest.json (container, size, sha256, pak, pak_data_offset) + texts.csv + HUONG_DAN.txt. Giới hạn 256 MB. Mọi engine; container chưa có trình đọc chỉ có dòng quét thô trong texts.csv (manifest.not_exported).
+- Test text 31→36. CHƯA có: nhập bản dịch + ghi lại pak (bước kế), xử lý font tiếng Việt. Chưa chạy trên IPA thật.
+
+
+## v0.17.1-fontinv
+- THÊM font_inventory (texts_index.json, manifest gói dịch, UI): liệt kê trong pak các file font (.ttf/.otf/.fnt…) và ảnh atlas font bitmap (cùng tên với .fnt, hoặc đường dẫn có font/glyph/charset); các file này (≤ 6 MB) vào gói dịch để dựng font tiếng Việt thay thế. Test text 36→39.
+- CHƯA có: bộ sinh font Việt (bitmap/TTF) – cần danh sách atlas thật của Dead Cells từ lần chạy mới.

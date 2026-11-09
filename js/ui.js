@@ -596,7 +596,7 @@
       kvRow(kv, 'Ngôn ngữ', Object.keys(sm.by_lang).map(function (k) { return k + ' ×' + sm.by_lang[k]; }).join(', ') || '—');
       kvRow(kv, 'Định dạng', Object.keys(sm.by_format).map(function (k) { return k + ' ×' + sm.by_format[k]; }).join(', ') || '—');
       kvRow(kv, 'Kiểm tra', 'có placeholder ' + sm.with_placeholders + ' · độ tin cậy thấp (giống ID/đường dẫn) ' + sm.low_confidence + ' · khóa trùng ' + sm.duplicate_keys + ' · file bị bỏ ' + sm.skipped + ' · chưa hỗ trợ ' + sm.unsupported);
-      kvRow(kv, 'Font trong pak', sm.pak_fonts_ok + '/' + sm.pak_fonts + ' hợp lệ (magic)');
+      kvRow(kv, 'Font trong pak', sm.pak_fonts_ok + '/' + sm.pak_fonts + ' hợp lệ (magic) · font/atlas liệt kê: ' + ((t.font_inventory || []).length) + (t.font_inventory && t.font_inventory.length ? ' (' + t.font_inventory.slice(0, 6).map(function (f) { return f.path; }).join(', ') + (t.font_inventory.length > 6 ? '…' : '') + ')' : ''));
     }
     kvRow(kv, 'Lưu ý', 'Là text có trong file; việc game có hiển thị hay không là giả thuyết (chưa Cổng 0).');
     box.appendChild(kv);

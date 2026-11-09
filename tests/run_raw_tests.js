@@ -27,6 +27,10 @@ const run = async function (name) {
   const jx = NS.TextExtract.extractBytes('a.json', new TextEncoder().encode('{"bone":"toesLeftB","t":"Hello world, again."}'));
   ok(jx.rows.length === 1 && jx.rows[0].text === 'Hello world, again.', 'JSON thường: bỏ ID 1 từ');
 
+  const TE = NS.TextExtract;
+  ok(TE.confidence('beheded sit00.png') === null && TE.confidence('Ri Anim 6.png') === null, 'tên file ảnh/âm thanh bị loại');
+  ok(TE.placeholders('+::prct::% dégâts. {Enracine@RO} la victime ::+power::').join('|') === '::prct::|{|@RO}|::+power::', 'placeholder kiểu Dead Cells: ::x:: và {từ@XX}: ' + TE.placeholders('+::prct::% dégâts. {Enracine@RO} la victime ::+power::').join('|'));
+
   let r = await run('raw_pak'); const t = r.texts, tx = t.rows.map(function (x) { return x.text; });
   ok(r.pak_heads.pak_files[0].heaps.status !== 'ok', 'pak header lạ → không đọc được cây (unverified/partial)');
   ok(tx.indexOf('Press any button to continue the game.') >= 0, 'raw: chuỗi UTF-8 trần');
