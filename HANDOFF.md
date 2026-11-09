@@ -32,3 +32,16 @@
 - pak_heads.js: parseHeapsPak thử 8 bố cục (checksum 4/0/8/16/32 byte; gốc có/không tên), CHỈ nhận bố cục nào kết thúc cây đúng chỗ có "DATA" (bằng chứng mạnh). Header dài hơn phần đầu: đọc lại đủ header cả với pak nén deflate (trước đây chỉ pak không nén). Ghi layouts_tried vào kết quả/log để chẩn đoán.
 - ipa_reader: log mỗi pak (16 byte đầu, kích thước, kiểu nén, kết luận, ghi chú) + lý do "chưa hỗ trợ".
 - Test: pakheads 21, text 31, candidates 47, + các bộ cũ. VẪN LÀ DỮ LIỆU GIẢ LẬP. NGUYÊN NHÂN THẬT của 5 pak "chưa hỗ trợ" chưa biết (log cũ không ghi) → cần log mới / pak_heads.zip.
+
+
+## v0.15.3-heapsprobe
+- Log Dead Cells 3.5.9 thật: 5 pak (res..res4) có magic "PAK" v1, header_size + data_size == kích thước file (khớp), nhưng 4 byte ở offset 12..15 GIỐNG HỆT ở cả 5 pak (66 35 66 65) và cây không khớp bố cục nào → parser vẫn 'unverified' (0 file, 0 text).
+- THÊM: 4 bố cục thử cây bắt đầu @16; `header_probe` (hex byte 12..76, entropy, tỉ lệ ASCII) vào pak_heads.json và dòng log PAK. Tests pak 21→23 ca.
+- CHƯA giải quyết: chưa có byte header thật nên chưa biết bố cục đúng (hoặc header bị xáo trộn/mã hóa). Cần người dùng gửi pak_heads.zip (hoặc log mới có `probe`).
+
+
+## v0.16.0-rawfallback
+- Theo yêu cầu người dùng: hỗ trợ MỌI game/engine, kể cả chưa có trình đọc. THÊM js/modules/raw_strings.js: quét chuỗi thô streaming (UTF-8 mọi ngôn ngữ + UTF-16LE Latin; tách giá trị JSON/XML) trên pak không rõ cấu trúc và các container .bin/.dat/.obb/.assets/.lua/…; mỗi dòng có offset @0x…; format 'raw', container 'raw:<file>'.
+- Tích hợp text_extract bước (3); giới hạn: 1100 MB/file, 2500 MB tổng, 40 file. Test: tests/make_raw_ipas.py + tests/run_raw_tests.js (15 ca, GIẢ LẬP). Dữ liệu ngẫu nhiên 2 MB → ~3 dòng rác.
+- [HYPOTHESIS]: bỏ sót text nén/mã hóa/UTF-16 không-Latin; có thể lẫn rác. CHƯA chạy trên Dead Cells thật.
+- Chưa làm: ghi ngược (patch) theo offset, UTF-16 CJK, quét thô executable.

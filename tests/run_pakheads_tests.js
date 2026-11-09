@@ -2,7 +2,7 @@
 // Kiểm thử module pak_heads. Dữ liệu GIẢ LẬP; chỉ chứng minh logic, KHÔNG chứng minh đúng trên pak Dead Cells thật.
 const fs = require('fs'), path = require('path');
 globalThis.self = globalThis; globalThis.window = globalThis;
-['plist_parser', 'binary_reader', 'modules/hash', 'modules/magic_bytes', 'modules/archive_scanner', 'modules/detect_engine', 'modules/file_scanner', 'modules/unity_dump', 'modules/metadata_dump', 'modules/metadata_tables', 'modules/font_dump', 'modules/unity_fs', 'modules/serialized_file', 'modules/font_metrics', 'modules/tmp_font', 'modules/pak_heads', 'modules/candidates', 'ipa_reader'].forEach(function (f) {
+['plist_parser', 'binary_reader', 'modules/hash', 'modules/magic_bytes', 'modules/archive_scanner', 'modules/detect_engine', 'modules/file_scanner', 'modules/unity_dump', 'modules/metadata_dump', 'modules/metadata_tables', 'modules/font_dump', 'modules/unity_fs', 'modules/serialized_file', 'modules/font_metrics', 'modules/tmp_font', 'modules/pak_heads', 'modules/raw_strings', 'modules/candidates', 'ipa_reader'].forEach(function (f) {
   (0, eval)(fs.readFileSync(path.join(__dirname, '..', 'js', f + '.js'), 'utf8'));
 });
 const NS = globalThis.IPAStudio, P = NS.PakHeads, dir = process.argv[2] || '/tmp/fake_ipas';
@@ -50,6 +50,19 @@ const run = async function (name) {
     const hs = 12 + tree.length, b = new Uint8Array([0x50, 0x41, 0x4b, 0].concat(u32(hs), u32(5), tree, nm('DATA'), [1, 2, 3, 4, 5]));
     const q = P.parseHeapsPak(b, b.length);
     ok(q.status === 'ok' && q.layout.checksum_bytes === 0 && q.files_total === 1 && q.sample_paths[0] === 'x.po', 'bố cục csum=0 được nhận (DATA khớp)');
+  })();
+  /* cây bắt đầu ở offset 16 (4 byte lạ sau header) được nhận nhờ "DATA" khớp; probe chẩn đoán khi không khớp */
+  (function () {
+    const nm = function (t) { return Array.from(Buffer.from(t)); };
+    const u32 = function (v) { return [v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >> 24) & 255]; };
+    const tree = [0, 1].concat(u32(1), [4], nm('x.po'), [0], u32(0), u32(5), u32(0));
+    const hs = 16 + tree.length, b = new Uint8Array([0x50, 0x41, 0x4b, 1].concat(u32(hs), u32(5), [0x66, 0x35, 0x66, 0x65], tree, nm('DATA'), [1, 2, 3, 4, 5]));
+    const q = P.parseHeapsPak(b, b.length);
+    ok(q.status === 'ok' && q.layout.tree_start === 16 && q.sample_paths[0] === 'x.po', 'cây bắt đầu @16 được nhận (DATA khớp)');
+    const g = new Uint8Array(300); g.set([0x50, 0x41, 0x4b, 1]); for (let i = 12; i < 300; i++) g[i] = (i * 197 + 31) & 255;
+    new DataView(g.buffer).setUint32(4, 200, true); new DataView(g.buffer).setUint32(8, 50, true);
+    const z = P.parseHeapsPak(g, 250);
+    ok(z.status === 'unverified' && z.header_probe && z.header_probe.entropy_bits_per_byte > 7 && /^[0-9a-f ]+$/.test(z.header_probe.bytes_12_76_hex), 'header rác → unverified + header_probe (entropy cao)');
   })();
   /* pak nén deflate + header dài hơn head → đọc lại đủ header (partial → ok) */
   const small = new File([fs.readFileSync(path.join(dir, 'text_pak.ipa'))], 't.ipa');

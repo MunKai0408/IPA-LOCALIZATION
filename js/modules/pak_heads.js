@@ -21,8 +21,8 @@
   function extOf(n) { const i = n.lastIndexOf('.'); return i < 0 ? '' : n.slice(i + 1).toLowerCase(); }
 
   /** Thử 1 bố cục cây (csum = số byte checksum sau pos/size; rootNamed = gốc có tên-độ-dài). Thuần hàm. */
-  function walkTree(head, dv, csum, rootNamed) {
-    const r = { pos: 12, truncated: false, bad: null, entries: 0, files: [], dirs: 0, top: {} };
+  function walkTree(head, dv, csum, rootNamed, start) {
+    const r = { pos: start || 12, truncated: false, bad: null, entries: 0, files: [], dirs: 0, top: {} };
     const need = function (n) { if (r.pos + n > head.length) { r.truncated = true; return false; } return true; };
     function walk(prefix, depth) {
       if (r.truncated || r.bad) return;
@@ -54,6 +54,16 @@
     return r;
   }
 
+  /** Chẩn đoán header khi không khớp bố cục: hex 64 byte sau header 12 byte, entropy Shannon và tỉ lệ ASCII in được trên vùng header đã đọc.
+      Entropy ≳ 7.5 bit/byte → header có thể bị nén/mã hóa/xáo trộn (không phải cây Heaps thuần). Thuần hàm. */
+  function probeHeader(head, headerSize) {
+    const n = Math.max(0, Math.min(head.length, headerSize || head.length) - 12), cnt = new Array(256).fill(0); let pr = 0;
+    for (let i = 12; i < 12 + n; i++) { cnt[head[i]]++; if (head[i] >= 32 && head[i] < 127) pr++; }
+    let ent = 0; for (let b = 0; b < 256; b++) if (cnt[b]) { const q = cnt[b] / n; ent -= q * Math.log2(q); }
+    return { bytes_12_76_hex: hex(head.subarray(12, 76), 64), sampled_bytes: n, entropy_bits_per_byte: n ? Math.round(ent * 100) / 100 : null, printable_ratio: n ? Math.round(pr / n * 100) / 100 : null,
+      interpretation: !n ? 'không đủ dữ liệu' : ent > 7.5 ? '[HYPOTHESIS] entropy cao: header có thể bị nén/mã hóa/xáo trộn' : ent < 5 ? '[HYPOTHESIS] entropy thấp: cấu trúc thô, có thể là cây với bố cục khác' : '[HYPOTHESIS] entropy trung bình: chưa kết luận' };
+  }
+
   /** Đọc thử header Heaps PAK từ phần đầu. Thử vài bố cục; chỉ nhận bố cục nào kết thúc cây đúng chỗ có "DATA". Thuần hàm (không I/O). */
   function parseHeapsPak(head, pakSize) {
     const out = { format: 'heaps_pak', status: 'unverified', evidence: 'HYPOTHESIS', version: null, header_size: null, data_size: null, layout: null,
@@ -66,22 +76,24 @@
     if (pakSize && out.header_size + out.data_size > pakSize + 16) out.notes.push('header_size + data_size lớn hơn kích thước file (lệch ' + (out.header_size + out.data_size - pakSize) + ' byte).');
 
     const at = function (o) { return o + 4 <= head.length ? ascii(head, o, 4) : null; };
-    const LAYOUTS = [{ csum: 4, rootNamed: true }, { csum: 4, rootNamed: false }, { csum: 0, rootNamed: true }, { csum: 0, rootNamed: false }, { csum: 8, rootNamed: true }, { csum: 8, rootNamed: false }, { csum: 16, rootNamed: true }, { csum: 32, rootNamed: true }];
+    const LAYOUTS = [{ csum: 4, rootNamed: true }, { csum: 4, rootNamed: false }, { csum: 0, rootNamed: true }, { csum: 0, rootNamed: false }, { csum: 8, rootNamed: true }, { csum: 8, rootNamed: false }, { csum: 16, rootNamed: true }, { csum: 32, rootNamed: true },
+      /* [HYPOTHESIS] pak Dead Cells thật có 4 byte lạ ngay sau header 12 byte (log: 66 35 66 65 ở mọi pak) → thử cây bắt đầu ở offset 16 */
+      { csum: 4, rootNamed: true, start: 16 }, { csum: 4, rootNamed: false, start: 16 }, { csum: 0, rootNamed: true, start: 16 }, { csum: 0, rootNamed: false, start: 16 }];
     let best = null, bestLay = null, dataStart = null; const tried = [];
     for (let i = 0; i < LAYOUTS.length; i++) {
-      const w = walkTree(head, dv, LAYOUTS[i].csum, LAYOUTS[i].rootNamed);
+      const w = walkTree(head, dv, LAYOUTS[i].csum, LAYOUTS[i].rootNamed, LAYOUTS[i].start);
       const ds = (!w.truncated && !w.bad) ? (at(w.pos) === 'DATA' ? w.pos + 4 : null) : null;
-      tried.push('csum=' + LAYOUTS[i].csum + (LAYOUTS[i].rootNamed ? '' : ',gốc không tên') + ': ' + (w.bad || (w.truncated ? 'cụt' : (ds === null ? 'không thấy DATA tại offset ' + w.pos : 'OK'))));
+      tried.push('csum=' + LAYOUTS[i].csum + (LAYOUTS[i].rootNamed ? '' : ',gốc không tên') + (LAYOUTS[i].start ? ',bắt đầu@' + LAYOUTS[i].start : '') + ': ' + (w.bad || (w.truncated ? 'cụt' : (ds === null ? 'không thấy DATA tại offset ' + w.pos : 'OK'))));
       if (ds !== null) { best = w; bestLay = LAYOUTS[i]; dataStart = ds; break; }
       if (!best) { best = w; bestLay = LAYOUTS[i]; } // giữ bố cục đầu tiên làm mặc định để báo cáo
       if (w.truncated && head.length < pakSize) { best = w; bestLay = LAYOUTS[i]; break; } // header dài hơn phần đã đọc (file còn nữa): dừng thử, cần đọc thêm
     }
-    out.layout = bestLay ? { checksum_bytes: bestLay.csum, root_named: bestLay.rootNamed } : null; out.layouts_tried = tried;
+    out.layout = bestLay ? { checksum_bytes: bestLay.csum, root_named: bestLay.rootNamed, tree_start: bestLay.start || 12 } : null; out.layouts_tried = tried;
     const w = best;
     out.entries_total = w.entries; out.dirs_total = w.dirs; out.files_total = w.files.length;
     if (dataStart !== null) { out.status = 'ok'; out.tree_complete = true; out.tree_end = w.pos; out.data_start = dataStart; }
     else if (w.truncated) { out.status = 'partial'; out.notes.push('Header dài hơn phần đầu đã đọc (' + head.length + ' byte); cần đọc ≥ ' + out.header_size + ' byte để thấy đủ cây.'); }
-    else { out.status = 'unverified'; out.notes.push('Không bố cục nào khớp "DATA": ' + tried.join(' | ')); }
+    else { out.status = 'unverified'; out.header_probe = probeHeader(head, out.header_size); out.notes.push('Không bố cục nào khớp "DATA": ' + tried.join(' | ')); }
     if (out.status === 'ok') { const oob = w.files.filter(function (f) { return f.pos + f.size > out.data_size; }).length; if (oob) out.notes.push(oob + ' file có pos+size vượt data_size → bố cục có thể sai.'); }
     const files = w.files; const eh = {}, langs = {};
     files.forEach(function (f) {
@@ -168,5 +180,5 @@
     return new Blob(parts, { type: 'application/zip' });
   }
 
-  NS.PakHeads = { SCHEMA: SCHEMA, LIMITS: LIMITS, run: run, parseHeapsPak: parseHeapsPak, toIndex: toIndex, headFiles: headFiles, buildZip: buildZip };
+  NS.PakHeads = { SCHEMA: SCHEMA, LIMITS: LIMITS, run: run, parseHeapsPak: parseHeapsPak, probeHeader: probeHeader, toIndex: toIndex, headFiles: headFiles, buildZip: buildZip };
 })(typeof window !== 'undefined' ? window : self);

@@ -9,7 +9,9 @@
   const NS = root.IPAStudio = root.IPAStudio || {};
 
   const SCHEMA = 'texts/1';
-  const LIMITS = { max_file_bytes: 8 * 1048576, max_files: 3000, max_rows: 300000, max_text_len: 20000, max_font_bytes: 6 * 1048576, max_font_total: 48 * 1048576, max_pak_target_bytes: 160 * 1048576 };
+  const LIMITS = { max_file_bytes: 8 * 1048576, max_files: 3000, max_rows: 300000, max_text_len: 20000, max_font_bytes: 6 * 1048576, max_font_total: 48 * 1048576, max_pak_target_bytes: 160 * 1048576,
+    raw_file_bytes: 1100 * 1048576, raw_total_bytes: 2500 * 1048576, raw_max_files: 40 };
+  const RAW_EXT = { pak: 1, pck: 1, bin: 1, dat: 1, data: 1, obb: 1, assets: 1, bundle: 1, unity3d: 1, bytes: 1, res: 1, arc: 1, pkg: 1, wad: 1, lua: 1, luac: 1, jsc: 1, js: 1, db: 1, sqlite: 1, bank: 1, resource: 1, resS: 1, mpq: 1, vfs: 1, big: 1, rpa: 1, rgss3a: 1, dll: 1, hl: 1, lang: 1, loc: 1, msg: 1, bd: 1, cfg: 1, ini: 1, dict: 1, lng: 1 };
   const TEXT_EXT = { strings: 1, stringsdict: 1, xcstrings: 1, json: 1, cdb: 1, csv: 1, tsv: 1, po: 1, pot: 1, xml: 1, properties: 1, txt: 1 };
   const FONT_EXT = { ttf: 'ttf', otf: 'otf', ttc: 'ttc', woff: 'woff', woff2: 'woff2', fnt: 'bmfont' };
   const SKIP_RE = /(^|\/)(frameworks|_codesignature|sc_info|plugins|watch)\//i;
@@ -237,7 +239,7 @@
     const IR = NS.IpaReader, cancelled = opts.isCancelled || function () { return false; };
     const chk = function () { if (cancelled()) { const e = new Error('Đã hủy'); e.code = 'CANCELLED'; throw e; } };
     const out = { schema: SCHEMA, status: 'no_text', reason: 'Không trích được text', rows: [], files: [], skipped: [], unsupported: [], warnings: [], pak_fonts: [], summary: null,
-      limitations: ['Chỉ trích text ở định dạng mở/đọc được tĩnh. Unity (I2/TextAsset/bundle), Unreal locres/pak, Cocos/Godot pck, dữ liệu mã hóa/nén riêng: CHƯA hỗ trợ (xem unsupported).',
+      limitations: ['Chỉ trích text ở định dạng mở/đọc được tĩnh. Unity (I2/TextAsset/bundle), Unreal locres/pak, Cocos/Godot pck, dữ liệu mã hóa/nén riêng: CHƯA có trình đọc riêng (xem unsupported) – nhưng được quét chuỗi thô dự phòng (format \'raw\', [HYPOTHESIS]).',
         'Mỗi dòng là text có trong file (nội dung), nhưng việc game có HIỂN THỊ nó hay không là [HYPOTHESIS] – chưa qua Cổng 0, chưa canary.',
         'Cấu trúc pak Heaps đọc theo giả thuyết; nếu danh sách file hợp lệ nhưng nội dung không giải mã được thì bị bỏ qua và ghi vào skipped.'] };
     let nFiles = 0;
@@ -308,6 +310,32 @@
       } catch (err) { if (err && err.code === 'CANCELLED') throw err; out.warnings.push('Không đọc được nội dung pak ' + pk.zip_path + ': ' + ((err && err.message) || err)); }
     }
 
+    /* (3) DỰ PHÒNG MỌI ENGINE: quét chuỗi thô các container chưa có trình đọc (pak không rõ cấu trúc, .bin/.dat/.obb/.assets…). [HYPOTHESIS] */
+    if (opts.rawFallback !== false && NS.RawStrings) {
+      const unsup = new Set(out.unsupported.map(function (u) { return u.file; }));
+      const done = new Set(out.files.filter(function (f) { return f.container === 'ipa'; }).map(function (f) { return f.file; }));
+      const rc = entries.filter(function (e) {
+        if (e.dir || e.unsafe || e.encrypted || (e.method !== 0 && e.method !== 8) || e.size < 256 || e.size > LIMITS.raw_file_bytes) return false;
+        if (/(^|\/)(_codesignature|sc_info)\//i.test(e.name) || /(^|\/)frameworks\//i.test(e.name) || done.has(e.name)) return false;
+        return unsup.has(e.name) || !!RAW_EXT[extOf(e.name)];
+      }).sort(function (a, b) { return (unsup.has(b.name) ? 1 : 0) - (unsup.has(a.name) ? 1 : 0) || b.size - a.size; }).slice(0, LIMITS.raw_max_files);
+      let rawBytes = 0; out.raw = [];
+      for (let i = 0; i < rc.length; i++) {
+        chk(); const e = rc[i];
+        if (rawBytes + e.size > LIMITS.raw_total_bytes) { out.warnings.push('Quét thô dừng ở giới hạn ' + Math.round(LIMITS.raw_total_bytes / 1048576) + ' MB; bỏ ' + (rc.length - i) + ' file.'); break; }
+        try {
+          if (opts.onRawProgress) opts.onRawProgress(e.name, i, rc.length);
+          const r = await NS.RawStrings.scanEntry(file, e, { isCancelled: cancelled }); rawBytes += e.size;
+          const kept = r.rows.map(function (x) { const c = confidence(x.text); return c === null ? null : { key: '@0x' + x.offset.toString(16), text: x.text, lang: null, ctx: 'quét thô ' + x.enc + ' (chưa biết cấu trúc file)', conf: c }; }).filter(Boolean);
+          const before = out.rows.length;
+          addRows('raw:' + e.name, e.name, { format: 'raw', rows: kept, bad: 0, enc: 'raw' }, langOfPath(e.name));
+          out.raw.push({ file: e.name, bytes: r.bytes, rows: out.rows.length - before, truncated: r.truncated });
+          if (unsup.has(e.name)) { const u = out.unsupported.find(function (x) { return x.file === e.name; }); if (u) u.raw_rows = out.rows.length - before; }
+        } catch (err) { if (err && err.code === 'CANCELLED') throw err; out.skipped.push({ container: 'raw', file: e.name, reason: (err && err.message) || String(err) }); }
+      }
+      if (out.raw.length) out.warnings.push('Quét thô [HYPOTHESIS]: ' + out.raw.length + ' file, có thể lẫn rác và bỏ sót text nén/mã hóa; mỗi dòng có offset để đối chiếu.');
+    }
+
     /* tóm tắt + kiểm tra (validate) */
     const byLang = {}, byFmt = {}; let withPh = 0, low = 0, emptyT = 0, dups = 0;
     out.rows.forEach(function (r) {
@@ -327,7 +355,7 @@
     return '\uFEFF' + lines.join('\r\n') + '\r\n';
   }
   function toIndex(r) {
-    return { schema: SCHEMA, status: r.status, reason: r.reason, summary: r.summary, files: r.files, skipped: r.skipped, unsupported: r.unsupported, pak_fonts: r.pak_fonts, warnings: r.warnings, limitations: r.limitations };
+    return { raw: r.raw || [], schema: SCHEMA, status: r.status, reason: r.reason, summary: r.summary, files: r.files, skipped: r.skipped, unsupported: r.unsupported, pak_fonts: r.pak_fonts, warnings: r.warnings, limitations: r.limitations };
   }
   function fontFiles(r) { return (r._fontBlobs || []).slice(); }
 

@@ -597,7 +597,7 @@
       const pr = await NS.PakHeads.run(file, entries, { isCancelled: cancelled });
       result.pak_heads = pr;
       pr.warnings.forEach(function (w) { warn(w); });
-      pr.pak_files.forEach(function (p) { log('INFO', 'PAK ' + p.zip_path, { size: p.size, csize: p.csize, method: p.compress_type, first16: p.first_16_hex, format_guess: p.format_guess, heaps: p.heaps ? { status: p.heaps.status, version: p.heaps.version, header_size: p.heaps.header_size, data_size: p.heaps.data_size, files: p.heaps.files_total, notes: p.heaps.notes } : null, error: p.error }); });
+      pr.pak_files.forEach(function (p) { log('INFO', 'PAK ' + p.zip_path, { size: p.size, csize: p.csize, method: p.compress_type, first16: p.first_16_hex, format_guess: p.format_guess, heaps: p.heaps ? { status: p.heaps.status, version: p.heaps.version, header_size: p.heaps.header_size, data_size: p.heaps.data_size, files: p.heaps.files_total, probe: p.heaps.header_probe || null, notes: p.heaps.notes } : null, error: p.error }); });
       const heapsN = pr.pak_files.filter(function (p) { return p.format_guess === 'heaps_pak' || p.format_guess === 'heaps_pak?'; }).length;
       if (heapsN && result.engine && result.engine.engine === 'unreal' && result.engine.status !== 'confirmed')
         warn('Engine "Unreal" chỉ suy ra từ đuôi .pak, nhưng ' + heapsN + '/' + pr.pak_files.length + ' pak có magic "PAK" ở đầu file (kiểu Heaps/HashLink, không phải Unreal) → bỏ qua kết luận Unreal.');
