@@ -20,9 +20,43 @@
   function ascii(u8, o, n) { let s = ''; for (let i = 0; i < n && o + i < u8.length; i++) s += String.fromCharCode(u8[o + i]); return s; }
   function extOf(n) { const i = n.lastIndexOf('.'); return i < 0 ? '' : n.slice(i + 1).toLowerCase(); }
 
-  /** Đọc thử header Heaps PAK từ phần đầu. Thuần hàm (không I/O). */
+  /** Thử 1 bố cục cây (csum = số byte checksum sau pos/size; rootNamed = gốc có tên-độ-dài). Thuần hàm. */
+  function walkTree(head, dv, csum, rootNamed) {
+    const r = { pos: 12, truncated: false, bad: null, entries: 0, files: [], dirs: 0, top: {} };
+    const need = function (n) { if (r.pos + n > head.length) { r.truncated = true; return false; } return true; };
+    function walk(prefix, depth) {
+      if (r.truncated || r.bad) return;
+      if (depth > LIMITS.max_depth) { r.bad = 'cây quá sâu'; return; }
+      let name = '';
+      if (depth > 0 || rootNamed) {
+        if (!need(1)) return;
+        const nl = head[r.pos++]; if (!need(nl)) return;
+        try { name = new TextDecoder('utf-8', { fatal: true }).decode(head.subarray(r.pos, r.pos + nl)); } catch (_) { r.bad = 'tên entry không phải UTF-8 tại offset ' + r.pos; return; }
+        r.pos += nl;
+        if (name.indexOf('\0') >= 0 || name.indexOf('/') >= 0) { r.bad = 'tên entry đáng ngờ'; return; }
+      }
+      if (!need(1)) return; const flags = head[r.pos++];
+      const full = depth === 0 ? '' : (prefix ? prefix + '/' : '') + name;
+      if (r.entries >= LIMITS.max_tree_entries) { r.bad = 'vượt giới hạn số entry'; return; }
+      r.entries++;
+      if (flags & 1) {
+        if (!need(4)) return; const cnt = dv.getUint32(r.pos, true); r.pos += 4;
+        if (cnt > LIMITS.max_tree_entries) { r.bad = 'số con thư mục bất thường (' + cnt + ')'; return; }
+        r.dirs++;
+        for (let i = 0; i < cnt && !r.truncated && !r.bad; i++) walk(full, depth + 1);
+      } else {
+        if (!need(8 + csum)) return; const p = dv.getUint32(r.pos, true), sz = dv.getUint32(r.pos + 4, true); r.pos += 8 + csum;
+        r.files.push({ path: full, pos: p, size: sz });
+        const t = full.split('/')[0]; r.top[t] = (r.top[t] || 0) + 1;
+      }
+    }
+    walk('', 0);
+    return r;
+  }
+
+  /** Đọc thử header Heaps PAK từ phần đầu. Thử vài bố cục; chỉ nhận bố cục nào kết thúc cây đúng chỗ có "DATA". Thuần hàm (không I/O). */
   function parseHeapsPak(head, pakSize) {
-    const out = { format: 'heaps_pak', status: 'unverified', evidence: 'HYPOTHESIS', version: null, header_size: null, data_size: null,
+    const out = { format: 'heaps_pak', status: 'unverified', evidence: 'HYPOTHESIS', version: null, header_size: null, data_size: null, layout: null,
       tree_complete: false, entries_total: 0, files_total: 0, dirs_total: 0, languages_hint: [], ext_histogram: {}, top_dirs: [], sample_paths: [],
       text_like_paths: [], notes: [] };
     if (head.length < 12 || ascii(head, 0, 3) !== 'PAK') { out.status = 'not_heaps_pak'; out.notes.push('Không có magic "PAK" ở đầu file.'); return out; }
@@ -31,57 +65,34 @@
     if (out.header_size < 12 || out.header_size > pakSize) { out.notes.push('header_size ngoài phạm vi file → không đọc cây.'); return out; }
     if (pakSize && out.header_size + out.data_size > pakSize + 16) out.notes.push('header_size + data_size lớn hơn kích thước file (lệch ' + (out.header_size + out.data_size - pakSize) + ' byte).');
 
-    let pos = 12, truncated = false, bad = null;
-    const files = [], dirs = []; const top = {};
-    const need = function (n) { if (pos + n > head.length) { truncated = true; return false; } return true; };
-    function walk(prefix, depth) {
-      if (truncated || bad) return;
-      if (depth > LIMITS.max_depth) { bad = 'cây quá sâu'; return; }
-      if (!need(1)) return;
-      const nl = head[pos++]; if (!need(nl + 1)) return;
-      let name = ''; try { name = new TextDecoder('utf-8', { fatal: true }).decode(head.subarray(pos, pos + nl)); } catch (_) { bad = 'tên entry không phải UTF-8 tại offset ' + pos; return; }
-      pos += nl; const flags = head[pos++];
-      if (name.indexOf('\0') >= 0 || name.indexOf('..') >= 0 && /(^|\/)\.\.(\/|$)/.test(name)) { bad = 'tên entry đáng ngờ'; return; }
-      const full = depth === 0 ? '' : (prefix ? prefix + '/' : '') + name;
-      if (out.entries_total >= LIMITS.max_tree_entries) { bad = 'vượt giới hạn số entry'; return; }
-      out.entries_total++;
-      if (flags & 1) {
-        if (!need(4)) return; const cnt = dv.getUint32(pos, true); pos += 4;
-        if (cnt > LIMITS.max_tree_entries) { bad = 'số con thư mục bất thường (' + cnt + ')'; return; }
-        out.dirs_total++; if (full) dirs.push(full);
-        for (let i = 0; i < cnt && !truncated && !bad; i++) walk(full, depth + 1);
-      } else {
-        if (!need(12)) return; const p = dv.getUint32(pos, true), sz = dv.getUint32(pos + 4, true); pos += 12;
-        out.files_total++; files.push({ path: full, pos: p, size: sz });
-        const t = full.split('/')[0]; top[t] = (top[t] || 0) + 1;
-      }
+    const at = function (o) { return o + 4 <= head.length ? ascii(head, o, 4) : null; };
+    const LAYOUTS = [{ csum: 4, rootNamed: true }, { csum: 4, rootNamed: false }, { csum: 0, rootNamed: true }, { csum: 0, rootNamed: false }, { csum: 8, rootNamed: true }, { csum: 8, rootNamed: false }, { csum: 16, rootNamed: true }, { csum: 32, rootNamed: true }];
+    let best = null, bestLay = null, dataStart = null; const tried = [];
+    for (let i = 0; i < LAYOUTS.length; i++) {
+      const w = walkTree(head, dv, LAYOUTS[i].csum, LAYOUTS[i].rootNamed);
+      const ds = (!w.truncated && !w.bad) ? (at(w.pos) === 'DATA' ? w.pos + 4 : null) : null;
+      tried.push('csum=' + LAYOUTS[i].csum + (LAYOUTS[i].rootNamed ? '' : ',gốc không tên') + ': ' + (w.bad || (w.truncated ? 'cụt' : (ds === null ? 'không thấy DATA tại offset ' + w.pos : 'OK'))));
+      if (ds !== null) { best = w; bestLay = LAYOUTS[i]; dataStart = ds; break; }
+      if (!best) { best = w; bestLay = LAYOUTS[i]; } // giữ bố cục đầu tiên làm mặc định để báo cáo
+      if (w.truncated && head.length < pakSize) { best = w; bestLay = LAYOUTS[i]; break; } // header dài hơn phần đã đọc (file còn nữa): dừng thử, cần đọc thêm
     }
-    walk('', 0);
-    if (bad) { out.status = 'unverified'; out.notes.push('Dừng đọc cây: ' + bad + '.'); }
-    else if (truncated) { out.status = 'partial'; out.notes.push('Header dài hơn phần đầu đã đọc (' + head.length + ' byte); cần tăng head_bytes ≥ ' + out.header_size + ' để đọc đủ cây.'); }
-    else {
-      out.tree_complete = true;
-      const at = function (o) { return o + 4 <= head.length ? ascii(head, o, 4) : null; };
-      out.tree_end = pos; out.data_start = null;
-      if (at(pos) === 'DATA') out.data_start = pos + 4; else if (at(out.header_size) === 'DATA') out.data_start = out.header_size + 4;
-      if (out.data_start !== null) { out.status = 'ok'; }
-      else { out.status = 'unverified'; out.notes.push('Cây đọc xong ở offset ' + pos + ' nhưng không thấy "DATA" tại header_size (' + out.header_size + ') → bố cục có thể khác Heaps chuẩn.'); }
-      // kiểm tra vị trí dữ liệu nằm trong phạm vi
-      const oob = files.filter(function (f) { return f.pos + f.size > out.data_size; }).length;
-      if (oob) out.notes.push(oob + ' file có pos+size vượt data_size → bố cục có thể sai.');
-    }
-    const eh = {}; const langs = {};
+    out.layout = bestLay ? { checksum_bytes: bestLay.csum, root_named: bestLay.rootNamed } : null; out.layouts_tried = tried;
+    const w = best;
+    out.entries_total = w.entries; out.dirs_total = w.dirs; out.files_total = w.files.length;
+    if (dataStart !== null) { out.status = 'ok'; out.tree_complete = true; out.tree_end = w.pos; out.data_start = dataStart; }
+    else if (w.truncated) { out.status = 'partial'; out.notes.push('Header dài hơn phần đầu đã đọc (' + head.length + ' byte); cần đọc ≥ ' + out.header_size + ' byte để thấy đủ cây.'); }
+    else { out.status = 'unverified'; out.notes.push('Không bố cục nào khớp "DATA": ' + tried.join(' | ')); }
+    if (out.status === 'ok') { const oob = w.files.filter(function (f) { return f.pos + f.size > out.data_size; }).length; if (oob) out.notes.push(oob + ' file có pos+size vượt data_size → bố cục có thể sai.'); }
+    const files = w.files; const eh = {}, langs = {};
     files.forEach(function (f) {
       const e = extOf(f.path) || '(không đuôi)'; eh[e] = (eh[e] || 0) + 1;
       const m = /(?:^|[\/_.-])(en|fr|de|es|ru|zh|ja|ko|pt|it|vi|tr|pl|cs|uk)(?:[\/_.-]|$)/i.exec(f.path); if (m) langs[m[1].toLowerCase()] = 1;
     });
-    out._files = files; // nội bộ: {path,pos,size}; bị loại khỏi toIndex
-    out.ext_histogram = eh; out.languages_hint = Object.keys(langs).sort();
-    out.top_dirs = Object.keys(top).sort(function (a, b) { return top[b] - top[a]; }).slice(0, 20).map(function (k) { return { name: k || '(gốc)', files: top[k] }; });
+    out._files = files; out.ext_histogram = eh; out.languages_hint = Object.keys(langs).sort();
+    out.top_dirs = Object.keys(w.top).sort(function (a, b) { return w.top[b] - w.top[a]; }).slice(0, 20).map(function (k) { return { name: k || '(gốc)', files: w.top[k] }; });
     const textRe = /(lang|locale|locali[sz]|i18n|l10n|string|text|dialog|message|translat|subtitle|\.cdb$|\.po$|\.xml$|\.json$|\.csv$|\.txt$)/i;
     const tl = files.filter(function (f) { return textRe.test(f.path); });
-    out.text_like_paths = tl.slice(0, 300).map(function (f) { return f.path; });
-    out.text_like_total = tl.length;
+    out.text_like_paths = tl.slice(0, 300).map(function (f) { return f.path; }); out.text_like_total = tl.length;
     out.sample_paths = files.slice(0, LIMITS.sample_paths).map(function (f) { return f.path; });
     out.notes.push('[HYPOTHESIS] Tên file không phải bằng chứng file chứa text hiển thị; chưa qua Cổng 0.');
     return out;
@@ -107,8 +118,9 @@
         row._head = r.data; // giữ để tải .head; bị loại khỏi JSON trong toIndex
         if (ascii(r.data, 0, 3) === 'PAK') {
           row.heaps = parseHeapsPak(r.data, e.size);
-          if (row.heaps.status === 'partial' && e.method === 0 && row.heaps.header_size + 8 <= 64 * 1048576) {
-            const r2 = await IR.readEntry(file, e, { head: true, max: row.heaps.header_size + 8 }); // pak lưu không nén → đọc đủ header
+          if (row.heaps.status === 'partial' && row.heaps.header_size + 8 <= 64 * 1048576) {
+            const r2 = await IR.readEntry(file, e, { head: true, max: row.heaps.header_size + 8 }); // đọc đủ header (pak lưu không nén hoặc deflate đều được)
+            row._head = r2.data;
             row.heaps = parseHeapsPak(r2.data, e.size);
           } row.format_guess = row.heaps.status === 'ok' ? 'heaps_pak' : 'heaps_pak?'; }
         else if (ascii(r.data, 0, 4) === 'GDPC') row.format_guess = 'godot_pck';

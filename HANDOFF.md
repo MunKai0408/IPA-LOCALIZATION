@@ -26,3 +26,9 @@
 - KHÔNG làm (ghi trong result.unsupported/limitations): Unity (I2/TextAsset/bundle), Unreal locres/pak, Godot pck, Cocos, dữ liệu mã hóa. Bố cục Heaps PAK là [HYPOTHESIS], chưa đối chiếu pak thật; nếu mọi file text trong pak không giải mã được → cảnh báo bố cục sai.
 - Test: tests/make_text_ipas.py + run_text_tests.js (31 ca, GIẢ LẬP). Các bộ cũ giữ nguyên: 359/112/86/76/217/141 + candidates 47 + pakheads 17 (các bộ metadata/literal/tables/fontmetrics/tmp/unity-test khác chưa chạy lại ở bản này).
 - Người dùng: chạy trang trên IPA Dead Cells thật → gửi texts_index.json + pak_heads.zip để đối chiếu.
+
+## v0.15.2-heapsfix (sửa lỗi sau log Dead Cells thật: 0 dòng text, 5 pak "chưa hỗ trợ")
+- Nhận diện engine: `unreal.pak` (chỉ có đuôi *.pak) hạ từ medium → weak; pak có magic "PAK" = Heaps nên ipa_reader cảnh báo bỏ kết luận Unreal. candidates.js: pak đã biết Heaps/Godot (theo pak_heads) → `heaps.pak`, KHÔNG còn `unreal.pak_container`.
+- pak_heads.js: parseHeapsPak thử 8 bố cục (checksum 4/0/8/16/32 byte; gốc có/không tên), CHỈ nhận bố cục nào kết thúc cây đúng chỗ có "DATA" (bằng chứng mạnh). Header dài hơn phần đầu: đọc lại đủ header cả với pak nén deflate (trước đây chỉ pak không nén). Ghi layouts_tried vào kết quả/log để chẩn đoán.
+- ipa_reader: log mỗi pak (16 byte đầu, kích thước, kiểu nén, kết luận, ghi chú) + lý do "chưa hỗ trợ".
+- Test: pakheads 21, text 31, candidates 47, + các bộ cũ. VẪN LÀ DỮ LIỆU GIẢ LẬP. NGUYÊN NHÂN THẬT của 5 pak "chưa hỗ trợ" chưa biết (log cũ không ghi) → cần log mới / pak_heads.zip.

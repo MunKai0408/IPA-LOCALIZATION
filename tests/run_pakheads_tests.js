@@ -41,5 +41,24 @@ const run = async function (name) {
   big[12] = 0; big[13] = 1; new DataView(big.buffer).setUint32(14, 999, true);
   ok(P.parseHeapsPak(big, 100000).status === 'partial' || P.parseHeapsPak(big, 100000).status === 'unverified', 'head cắt/lệch → partial/unverified, không ném lỗi');
   ok(P.parseHeapsPak(new Uint8Array([1, 2, 3]), 3).status === 'not_heaps_pak', 'không có magic → not_heaps_pak');
+
+  /* bố cục không checksum (csum=0) được nhận nhờ "DATA" khớp */
+  (function () {
+    const nm = function (t) { return Array.from(Buffer.from(t)); };
+    const u32 = function (v) { return [v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >> 24) & 255]; };
+    const tree = [0, 1].concat(u32(1), [4], nm('x.po'), [0], u32(0), u32(5));
+    const hs = 12 + tree.length, b = new Uint8Array([0x50, 0x41, 0x4b, 0].concat(u32(hs), u32(5), tree, nm('DATA'), [1, 2, 3, 4, 5]));
+    const q = P.parseHeapsPak(b, b.length);
+    ok(q.status === 'ok' && q.layout.checksum_bytes === 0 && q.files_total === 1 && q.sample_paths[0] === 'x.po', 'bố cục csum=0 được nhận (DATA khớp)');
+  })();
+  /* pak nén deflate + header dài hơn head → đọc lại đủ header (partial → ok) */
+  const small = new File([fs.readFileSync(path.join(dir, 'text_pak.ipa'))], 't.ipa');
+  const rr = await NS.IpaReader.analyze(small, {}, { step() {}, progress() {}, log() {}, isCancelled: undefined });
+  const zp = await NS.IpaReader.openZip(small); const pe = zp.entries.find(function (e) { return /res\.pak$/.test(e.name); });
+  const pr2 = await P.run(small, zp.entries, { headBytes: 4096 }); ok(pr2.pak_files[0].heaps.status === 'ok', 'head nhỏ nhưng đủ → ok');
+  const hs0 = pr2.pak_files[0].heaps.header_size;
+  const tiny = await NS.IpaReader.readEntry(small, pe, { head: true, max: 20 });
+  const pp = P.parseHeapsPak(tiny.data, pe.size); ok(pp.status === 'partial', 'head 20 byte < header → partial (pak nén method ' + pe.method + ')');
+  ok(rr.candidates.candidates.some(function (c) { return c.kind === 'heaps.pak'; }) && !rr.candidates.candidates.some(function (c) { return c.kind === 'unreal.pak_container'; }), 'candidates: pak Heaps → heaps.pak, KHÔNG unreal.pak_container');
   console.log(fail ? 'FAILED ' + fail + '/' + n : 'PASS ' + n + '/' + n); process.exit(fail ? 1 : 0);
 })();

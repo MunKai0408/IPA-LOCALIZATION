@@ -162,7 +162,12 @@
         languages: langs.map(function (l) { return { code: l, slot: l, termCount: null }; }),
         notes: ['Unreal *.locres theo culture (thư mục cha của file là culture).'] });
     });
-    const paks = files.filter(function (f) { return /\.pak$/i.test(f.rel) || /\.(utoc|ucas)$/i.test(f.rel); });
+    const knownPak = Object.create(null);
+    ((ctx.pakHeads && ctx.pakHeads.pak_files) || []).forEach(function (p) { if (p.format_guess === 'heaps_pak' || p.format_guess === 'heaps_pak?' || p.format_guess === 'godot_pck') knownPak[p.zip_path] = p.format_guess; });
+    const heapsPaks = files.filter(function (f) { return knownPak[f.path] === 'heaps_pak' || knownPak[f.path] === 'heaps_pak?'; });
+    if (heapsPaks.length) out.push({ engine: 'heaps', kind: 'heaps.pak', key: 'heaps_pak', level: 'L2', paths: heapsPaks.map(function (f) { return { path: f.path, size: f.size }; }), languages: [],
+      notes: ['Magic "PAK" ở đầu file = pak kiểu Heaps (không phải Unreal). Text/font bên trong được trích ở bước text_extract nếu đọc được cây.'], risks: ['Bố cục pak là giả thuyết; xem texts_index.json.'] });
+    const paks = files.filter(function (f) { return (/\.pak$/i.test(f.rel) && !knownPak[f.path]) || /\.(utoc|ucas)$/i.test(f.rel); });
     if (paks.length && !Object.keys(loc).length) {
       out.push({ engine: 'unreal', kind: 'unreal.pak_container', key: 'paks', level: 'L2', paths: paks.map(function (f) { return { path: f.path, size: f.size }; }), languages: [],
         notes: ['Có pak/utoc/ucas nhưng không thấy *.locres lộ thiên: locres có thể nằm TRONG pak (chưa đọc, 10.1).'],
@@ -241,7 +246,7 @@
       if (appRoot && e.path.indexOf(appRoot) !== 0) return; // chỉ trong .app đang phân tích
       files.push({ path: e.path, rel: relPath({ appRoot: appRoot }, e.path), size: e.size });
     });
-    const ctx = { ipa: ipa, appRoot: appRoot, files: files, engine: res.engine };
+    const ctx = { ipa: ipa, appRoot: appRoot, files: files, engine: res.engine, pakHeads: ipa.pak_heads || null };
     let raw = [];
     for (let i = 0; i < detectors.length; i++) {
       if (opts.isCancelled && opts.isCancelled()) { const e = new Error('Đã hủy'); e.code = 'CANCELLED'; throw e; }

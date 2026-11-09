@@ -48,7 +48,7 @@
       { id: 'unreal.lib', tier: 'strong', label: 'libUE4 / libUnreal', re: /(^|\/)(libue4|libunreal)[^\/]*$/ },
       { id: 'unreal.exe', tier: 'strong', label: 'File thực thi UnrealGame', exe: /^unrealgame$/ },
       { id: 'unreal.cooked', tier: 'medium', label: 'cookeddata/', re: /^cookeddata\/$/ },
-      { id: 'unreal.pak', tier: 'medium', skipIf: ['unreal.paks'], label: '*.pak', re: /\.pak$/ },
+      { id: 'unreal.pak', tier: 'weak', skipIf: ['unreal.paks'], label: '*.pak', re: /\.pak$/ },
       { id: 'unreal.uasset', tier: 'medium', label: '*.uasset / *.umap / *.ubulk / *.uexp', re: /\.(uasset|umap|ubulk|uexp)$/ }
     ] },
     { key: 'cocos', name: 'Cocos2d-x / Cocos Creator', variants: ['Creator'], indicators: [
