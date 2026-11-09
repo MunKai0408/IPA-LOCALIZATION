@@ -120,3 +120,10 @@ Kiểm thử (giả lập): `python3 tests/make_tmp_ipas.py /tmp/fake_ipas && no
 
 ## Cập nhật 0.13.1 (sửa 5.2d theo dữ liệu thật)
 Đọc TMP_FontAsset trên DATA WING: bố cục xác nhận đúng, sửa 2 lỗi (glyph khoảng trắng nằm ngoài atlas; FaceInfo 20 trường) khiến 4/7 asset bị loại. Cần chạy lại trên DATA WING để xác nhận. Test: `python3 tests/make_tmp_ipas.py DIR && node tests/run_tmp_tests.js DIR`.
+
+## Cập nhật 0.14.0 (Phase 6, sub-phase 6.1): hệ ứng viên chứa text (MỌI engine)
+
+View mới **“Hệ ứng viên”** liệt kê mọi nơi có thể chứa text hiển thị, theo đường dẫn/class (không đọc nội dung): iOS `*.lproj/*.strings`, RPG Maker `data/*.json`, Godot `*.translation/*.po`, Unreal `*.locres`/pak, bảng theo tên (json/csv/xml/txt/lua…), Unity (class I2/Localize/StringTable, TextAsset tên giống bảng, bundle `localization-stringtables-*`). Nút **Tải candidates.json** (schema `candidates/1`).
+Lưu ý: mọi ứng viên là **HYPOTHESIS/UNKNOWN** (chưa có Cổng 0); tên file không phải bằng chứng; trang không tự gán `[RUNTIME-OK]`. Số term chưa đọc (null). Mới kiểm bằng IPA GIẢ LẬP, chưa kiểm trên game thật.
+Kiểm thử: `python3 tests/make_candidates_ipas.py /tmp/fake_ipas && node tests/run_candidates_tests.js /tmp/fake_ipas   # 47`.
+Việc dở cũ đã hủy: xem `docs/archive/`. Kế hoạch mới: `ROADMAP.md`.

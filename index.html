@@ -28,6 +28,7 @@
       <button class="nav-item" data-view="engine"><span class="nav-icon" aria-hidden="true">⚙</span>Engine</button>
       <button class="nav-item" data-view="explorer"><span class="nav-icon" aria-hidden="true">🗂</span>File Explorer</button>
       <button class="nav-item" data-view="fonts"><span class="nav-icon" aria-hidden="true">Aa</span>Font</button>
+      <button class="nav-item" data-view="candidates"><span class="nav-icon" aria-hidden="true">◎</span>Hệ ứng viên</button>
       <button class="nav-item" data-view="text"><span class="nav-icon" aria-hidden="true">✎</span>Văn bản</button>
       <button class="nav-item" data-view="localization"><span class="nav-icon" aria-hidden="true">🌐</span>Localization</button>
       <button class="nav-item" data-view="runtime"><span class="nav-icon" aria-hidden="true">⏱</span>Runtime Strings</button>
@@ -174,6 +175,19 @@
         </div>
       </section>
 
+      <!-- Phase 6.1: hệ ứng viên chứa text (mọi engine) -->
+      <section class="view" id="view-candidates" hidden>
+        <div class="card empty" id="candidates-empty">
+          <div class="empty-icon" aria-hidden="true">◎</div>
+          <h2>Hệ ứng viên</h2>
+          <p>Chưa có kết quả. Tải IPA ở mục “Phân tích IPA” rồi bấm Bắt đầu phân tích. Bước này liệt kê MỌI nơi có thể chứa text hiển thị (mọi engine) theo đường dẫn/class, kèm nhãn bằng chứng. Ở bản này mọi ứng viên chỉ là giả thuyết (HYPOTHESIS), chưa qua Cổng 0; tên file không phải bằng chứng.</p>
+        </div>
+        <div id="candidates-detail" hidden>
+          <div class="toolbar"><span class="spacer"></span><button class="btn btn-sm" id="btn-candidates-json" type="button">Tải candidates.json</button></div>
+          <div class="card mt-3" id="candidates-body"></div>
+        </div>
+      </section>
+
       <!-- Các view chưa triển khai (ui.js sinh ra) -->
       <div id="generic-views"></div>
 
@@ -211,6 +225,7 @@
 <script src="js/modules/serialized_file.js"></script>
 <script src="js/modules/font_metrics.js"></script>
 <script src="js/modules/tmp_font.js"></script>
+  <script src="js/modules/candidates.js"></script>
 <script src="js/ipa_reader.js"></script>
 <script src="js/worker_manager.js"></script>
 <script src="js/state.js"></script>

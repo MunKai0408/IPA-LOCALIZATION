@@ -543,3 +543,12 @@ TmpItem = { id, file_id, source(đường dẫn file .assets), object_index, pat
 
 ## Chưa tồn tại (đừng gọi)
 Giải mã Texture2D atlas, liên kết component TextMeshPro → TMP_FontAsset, TMP trong node bundle, kerning/fallback/material, ghi ngược/tạo lại atlas, gộp TMP vào `fonts.json`/ZIP (Phase 9).
+
+## 6.1 Candidates (`js/modules/candidates.js`, schema `candidates/1`)
+
+`NS.Candidates.run(ipaResult, {isCancelled}) → Promise<Result>` (thuần dữ liệu, dùng `ipaResult.entries/appRoot/engine/serialized`).
+`register({id, run(ctx)})` / `unregister(id)` / `list()`: detector trả mảng ứng viên thô; `ctx = {ipa, appRoot, files:[{path,rel,size}], engine}`. Detector ném lỗi → ghi `detector_errors`, các detector khác vẫn chạy; `CANCELLED` được ném lại.
+`normalize(c, warnings)`: ép bất biến (STATIC-OK cần `evidence_note`; `ui_status` DRIVES_UI/UNUSED chỉ khi STATIC-OK; level∈L1–L6; paths ≤ 50 + `paths_total`).
+Ứng viên: `{id, engine, kind, level, paths[{path,size,lang}], languages[{code,slot,termCount|null}], componentRefs|null, ui_status, evidence, evidence_note, writable, risks[], notes[], detail, rank, suspected_secondary}`.
+Result: `{schema, sub_phase, status: ok|no_candidates|error|not_run, reason, engine, candidates[], detectors_run[], detector_errors[], gate0:{done:false}, summary, limitations[], warnings[]}`. `toIndex`, `toReportFields`.
+Xếp hạng: #ngôn ngữ ↓, tổng term ↓, componentRefs ↓, #file ↓; hệ ≤1 ngôn ngữ khi có hệ ≥2 ngôn ngữ → `suspected_secondary`.

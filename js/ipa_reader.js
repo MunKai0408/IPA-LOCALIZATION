@@ -590,6 +590,20 @@
       warn('Đọc TMP_FontAsset thất bại: ' + ((e && e.message) || e));
       step('tmp', 'error', (e && e.message) || 'Lỗi');
     }
+    /* --- Bước 14: hệ ứng viên chứa text (Phase 6, sub-phase 6.1): thuần dữ liệu, mọi engine. Lỗi chỉ thành cảnh báo. --- */
+    step('candidates', 'running', 'Liệt kê hệ ứng viên chứa text');
+    try {
+      if (!NS.Candidates) throw new IpaError('NO_CANDIDATES_MODULE', 'Thiếu module candidates.js');
+      const cr = await NS.Candidates.run(result, { isCancelled: cancelled });
+      result.candidates = cr; const cs = cr.summary || {};
+      log(cr.status === 'ok' ? 'SUCCESS' : 'INFO', 'Hệ ứng viên: ' + cr.status + ' – ' + cr.reason, cs);
+      cr.warnings.forEach(function (w) { warn(w); });
+      step('candidates', 'done', cr.status === 'ok' ? (cs.total + ' ứng viên · chưa qua Cổng 0') : 'Không thấy ứng viên');
+    } catch (e) {
+      if (e && e.code === 'CANCELLED') throw e;
+      warn('Liệt kê hệ ứng viên thất bại: ' + ((e && e.message) || e));
+      step('candidates', 'error', (e && e.message) || 'Lỗi');
+    }
     progress(1);
     return result;
   }

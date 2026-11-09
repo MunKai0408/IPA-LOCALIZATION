@@ -9,6 +9,7 @@
     engine:       { title: 'Engine',         icon: '⚙', phase: 2 },
     explorer:     { title: 'File Explorer',  icon: '🗂', phase: 3 },
     fonts:        { title: 'Font',           icon: 'Aa', phase: 5 },
+    candidates:   { title: 'Hệ ứng viên',    icon: '◎', phase: 6 },
     text:         { title: 'Văn bản',        icon: '✎', phase: 6, empty: 'Chưa có chuỗi nào được trích xuất.' },
     localization: { title: 'Localization',   icon: '🌐', phase: 6, empty: 'Chưa có bảng ngôn ngữ nào được nhận diện.' },
     runtime:      { title: 'Runtime Strings',icon: '⏱', phase: 7, empty: 'Chưa nhập runtime_strings.jsonl. Website không thể hook game; chỉ nhập dữ liệu do công cụ runtime bên ngoài tạo.' },
@@ -173,6 +174,7 @@
     renderExplorer(s);
     renderUnity(s);
     renderFonts(s);
+    renderCandidates(s);
   }
 
   /* ---------- Lỗi + chi tiết ứng dụng ---------- */
@@ -547,6 +549,35 @@
   function saveBlob(name, data, type) {
     const url = URL.createObjectURL(new Blob([data], { type: type || 'application/octet-stream' }));
     const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+  const CAND_RES = { ok: ['Hoàn tất', 'success'], no_candidates: ['Không thấy ứng viên', 'warning'], error: ['Lỗi', 'danger'], not_run: ['Chưa chạy', ''] };
+  let lastCandidates = null;
+  function renderCandidates(s) {
+    const c = (s.results && s.results.candidates) || null;
+    if (c === lastCandidates) return; lastCandidates = c;
+    const box = $('#candidates-body'), wrap = $('#candidates-detail'), empty = $('#candidates-empty'); if (!box || !wrap || !empty) return;
+    box.replaceChildren(); wrap.hidden = !c; empty.hidden = !!c; if (!c) return;
+    const st = CAND_RES[c.status] || [c.status, ''], sm = c.summary || {};
+    const kv = h('dl', { class: 'kv' });
+    kv.appendChild(h('dt', { text: 'Trạng thái' })); kv.appendChild(h('dd', {}, [h('span', { class: 'badge ' + st[1], text: st[0] })]));
+    kvRow(kv, 'Kết quả', c.reason);
+    kvRow(kv, 'Cổng 0', c.gate0 && c.gate0.done ? 'Đã chạy' : 'CHƯA chạy – mọi ứng viên là HYPOTHESIS/UNKNOWN; chỉ canary trên thiết bị mới chứng minh hệ nào hiển thị');
+    if (c.summary) kvRow(kv, 'Tổng', sm.total + ' ứng viên · có thông tin ngôn ngữ ' + sm.with_languages + ' · nghi là hệ phụ ' + sm.suspected_secondary);
+    box.appendChild(kv);
+    (c.detector_errors || []).forEach(function (e) { box.appendChild(h('p', { class: 'badge danger', text: 'Detector lỗi: ' + e.id + ' – ' + e.message })); });
+    if (!c.candidates.length) return;
+    const tbl = h('table', { class: 'tbl' });
+    tbl.appendChild(h('thead', {}, [h('tr', {}, ['#', 'Hệ', 'Cấp', 'Ngôn ngữ', 'Số file', 'UI', 'Bằng chứng'].map(function (t) { return h('th', { text: t }); }))]));
+    const tb = h('tbody');
+    c.candidates.slice(0, 200).forEach(function (x) {
+      const langs = x.languages.map(function (l) { return l.code; }).filter(Boolean).join(', ') || '—';
+      tb.appendChild(h('tr', {}, [
+        h('td', { text: String(x.rank) }), h('td', { text: x.kind + (x.suspected_secondary ? ' (nghi hệ phụ)' : '') }), h('td', { text: x.level }),
+        h('td', { text: langs }), h('td', { text: String(x.paths_total) }), h('td', { text: x.ui_status }), h('td', { text: '[' + x.evidence + ']' })]));
+    });
+    tbl.appendChild(tb);
+    const scroll = h('div', { class: 'table-wrap' }); scroll.appendChild(tbl); box.appendChild(scroll);
+    if (c.candidates.length > 200) box.appendChild(h('p', { text: 'Chỉ hiện 200 ứng viên đầu; tải candidates.json để xem đủ.' }));
   }
   function renderFonts(s) {
     const f = (s.results && s.results.fonts) || null, fmx = (s.results && s.results.fontMetrics) || null, tmx = (s.results && s.results.tmpFonts) || null;
