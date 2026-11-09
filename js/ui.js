@@ -9,6 +9,8 @@
     engine:       { title: 'Engine',         icon: '⚙', phase: 2 },
     explorer:     { title: 'File Explorer',  icon: '🗂', phase: 3 },
     fonts:        { title: 'Font',           icon: 'Aa', phase: 5 },
+    texts:        { title: 'Text trích xuất', icon: 'Aa', phase: 6 },
+    pakheads:     { title: 'File .pak',      icon: '▤', phase: 6 },
     candidates:   { title: 'Hệ ứng viên',    icon: '◎', phase: 6 },
     text:         { title: 'Văn bản',        icon: '✎', phase: 6, empty: 'Chưa có chuỗi nào được trích xuất.' },
     localization: { title: 'Localization',   icon: '🌐', phase: 6, empty: 'Chưa có bảng ngôn ngữ nào được nhận diện.' },
@@ -175,6 +177,8 @@
     renderUnity(s);
     renderFonts(s);
     renderCandidates(s);
+    renderPakHeads(s);
+    renderTexts(s);
   }
 
   /* ---------- Lỗi + chi tiết ứng dụng ---------- */
@@ -578,6 +582,59 @@
     tbl.appendChild(tb);
     const scroll = h('div', { class: 'table-wrap' }); scroll.appendChild(tbl); box.appendChild(scroll);
     if (c.candidates.length > 200) box.appendChild(h('p', { text: 'Chỉ hiện 200 ứng viên đầu; tải candidates.json để xem đủ.' }));
+  }
+  let lastTexts = null;
+  function renderTexts(s) {
+    const t = (s.results && s.results.texts) || null;
+    if (t === lastTexts) return; lastTexts = t;
+    const box = $('#texts-body'), wrap = $('#texts-detail'), empty = $('#texts-empty'); if (!box || !wrap || !empty) return;
+    box.replaceChildren(); wrap.hidden = !t; empty.hidden = !!t; if (!t) return;
+    const sm = t.summary || {}, kv = h('dl', { class: 'kv' });
+    kv.appendChild(h('dt', { text: 'Trạng thái' })); kv.appendChild(h('dd', {}, [h('span', { class: 'badge ' + (t.status === 'ok' ? 'success' : 'warning'), text: t.status === 'ok' ? 'Hoàn tất' : 'Không có text' })]));
+    kvRow(kv, 'Kết quả', t.reason);
+    if (t.summary) {
+      kvRow(kv, 'Ngôn ngữ', Object.keys(sm.by_lang).map(function (k) { return k + ' ×' + sm.by_lang[k]; }).join(', ') || '—');
+      kvRow(kv, 'Định dạng', Object.keys(sm.by_format).map(function (k) { return k + ' ×' + sm.by_format[k]; }).join(', ') || '—');
+      kvRow(kv, 'Kiểm tra', 'có placeholder ' + sm.with_placeholders + ' · độ tin cậy thấp (giống ID/đường dẫn) ' + sm.low_confidence + ' · khóa trùng ' + sm.duplicate_keys + ' · file bị bỏ ' + sm.skipped + ' · chưa hỗ trợ ' + sm.unsupported);
+      kvRow(kv, 'Font trong pak', sm.pak_fonts_ok + '/' + sm.pak_fonts + ' hợp lệ (magic)');
+    }
+    kvRow(kv, 'Lưu ý', 'Là text có trong file; việc game có hiển thị hay không là giả thuyết (chưa Cổng 0).');
+    box.appendChild(kv);
+    (t.warnings || []).forEach(function (w) { box.appendChild(h('p', { class: 'badge warning', text: w })); });
+    (t.unsupported || []).forEach(function (u) { box.appendChild(h('p', { class: 'badge', text: 'Chưa hỗ trợ: ' + u.file + ' – ' + u.reason })); });
+    if (!t.rows.length) return;
+    const tbl = h('table', { class: 'tbl' });
+    tbl.appendChild(h('thead', {}, [h('tr', {}, ['Ng.ngữ', 'File', 'Khóa', 'Text'].map(function (x) { return h('th', { text: x }); }))]));
+    const tb = h('tbody');
+    t.rows.slice(0, 200).forEach(function (r) { tb.appendChild(h('tr', {}, [h('td', { text: r.lang || '—' }), h('td', { text: r.file }), h('td', { text: r.key }), h('td', { text: r.text.length > 160 ? r.text.slice(0, 160) + '…' : r.text })])); });
+    tbl.appendChild(tb); const sc = h('div', { class: 'table-wrap' }); sc.appendChild(tbl); box.appendChild(sc);
+    if (t.rows.length > 200) box.appendChild(h('p', { text: 'Chỉ hiện 200 dòng đầu; tải texts.csv để xem đủ ' + t.rows.length + ' dòng.' }));
+  }
+  let lastPak = null;
+  function renderPakHeads(s) {
+    const p = (s.results && s.results.pakHeads) || null;
+    if (p === lastPak) return; lastPak = p;
+    const box = $('#pak-body'), wrap = $('#pak-detail'), empty = $('#pak-empty'); if (!box || !wrap || !empty) return;
+    box.replaceChildren(); wrap.hidden = !p; empty.hidden = !!p; if (!p) return;
+    const kv = h('dl', { class: 'kv' });
+    kv.appendChild(h('dt', { text: 'Trạng thái' })); kv.appendChild(h('dd', {}, [h('span', { class: 'badge ' + (p.status === 'ok' ? 'success' : p.status === 'no_pak' ? 'warning' : 'danger'), text: p.status === 'ok' ? 'Hoàn tất' : p.status === 'no_pak' ? 'Không có .pak' : 'Lỗi' })]));
+    kvRow(kv, 'Kết quả', p.reason);
+    box.appendChild(kv);
+    p.pak_files.forEach(function (x) {
+      const k = h('dl', { class: 'kv' }); const hp = x.heaps;
+      kvRow(k, 'File', x.zip_path + ' · ' + formatBytes(x.size));
+      kvRow(k, 'Đã lấy', x.error ? ('Lỗi: ' + x.error) : (formatBytes(x.saved_bytes) + ' · 16 byte đầu: ' + x.first_16_hex));
+      kvRow(k, 'Định dạng', x.format_guess + ' [HYPOTHESIS] – đuôi .pak không chứng minh Unreal');
+      if (hp) {
+        kvRow(k, 'Header Heaps', 'v' + hp.version + ' · header ' + hp.header_size + ' B · data ' + formatBytes(hp.data_size) + ' · cây: ' + hp.status);
+        kvRow(k, 'Bên trong', hp.files_total + ' file / ' + hp.dirs_total + ' thư mục' + (hp.languages_hint.length ? ' · ngôn ngữ gợi ý: ' + hp.languages_hint.join(', ') : ''));
+        kvRow(k, 'Đuôi file', Object.keys(hp.ext_histogram).sort(function (a, b) { return hp.ext_histogram[b] - hp.ext_histogram[a]; }).slice(0, 12).map(function (e) { return e + ' ×' + hp.ext_histogram[e]; }).join(', ') || '—');
+        if (hp.text_like_paths.length) kvRow(k, 'Đường dẫn giống text (' + hp.text_like_total + ')', hp.text_like_paths.slice(0, 15).join(' · '));
+        hp.notes.forEach(function (n) { kvRow(k, 'Ghi chú', n); });
+      }
+      box.appendChild(h('div', { class: 'card mt-3' }, [k]));
+    });
+    (p.warnings || []).forEach(function (w) { box.appendChild(h('p', { class: 'badge warning', text: w })); });
   }
   function renderFonts(s) {
     const f = (s.results && s.results.fonts) || null, fmx = (s.results && s.results.fontMetrics) || null, tmx = (s.results && s.results.tmpFonts) || null;

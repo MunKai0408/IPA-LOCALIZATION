@@ -18,6 +18,8 @@
     { id: 'serialized', label: 'SerializedFile (TextAsset, font, script)' },
     { id: 'fontmetrics', label: 'Metadata font & độ phủ tiếng Việt' },
     { id: 'tmp',      label: 'TMP_FontAsset (atlas ký tự)' },
+    { id: 'pakheads', label: 'Đầu file .pak (danh mục bên trong)' },
+    { id: 'texts', label: 'Trích xuất text & font trong pak' },
     { id: 'candidates', label: 'Hệ ứng viên chứa text (mọi engine)' },
     { id: 'report',   label: 'Tạo báo cáo' },
     { id: 'package',  label: 'Đóng gói ZIP' }

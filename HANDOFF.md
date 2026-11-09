@@ -10,3 +10,19 @@
 - Chưa làm: đọc nội dung bảng (số term = null), Cổng 0, UI chưa thử trong trình duyệt thật (chỉ node --check + test logic).
 - Evidence labels: candidates = [HYPOTHESIS]; parser/test = logic-only.
 - NEXT READY: 6.2, 7.1, 7.2, 7.3, 7.4 (xem ROADMAP.md).
+
+
+## v0.14.1-pakheads
+- THÊM js/modules/pak_heads.js (thay tools extract_pak_heads.py ngay trong trang): bước pipeline 'pakheads' đọc N byte đầu mọi *.pak bằng File.slice (mặc định 2 MB), nút tải pak_heads.json / pak_heads.zip (cùng quy ước tên .head + summary.json).
+- Đọc thử header Heaps PAK (Dead Cells: Heaps/HashLink). [HYPOTHESIS] – bố cục lấy từ trí nhớ về hxd.fmt.pak, CHƯA đối chiếu pak thật; sai lệch → status unverified/partial, không đoán. Đuôi .pak KHÔNG phải bằng chứng Unreal (manifest cũ gán 'Unreal PAK theo đuôi' là sai cho Dead Cells).
+- Test: tests/make_pakheads_ipas.py + tests/run_pakheads_tests.js (17 ca, dữ liệu GIẢ LẬP).
+- Người dùng: chạy trang trên IPA Dead Cells thật, tải pak_heads.zip gửi lại để đối chiếu bố cục.
+
+
+## v0.15.0-textextract
+- THÊM js/modules/text_extract.js + bước pipeline 'texts' + view "Text trích xuất": trích text từ IPA (.strings UTF-8/UTF-16/plist, .stringsdict, .xcstrings, JSON/.cdb, CSV/TSV, PO, XML kể cả Android strings.xml, .properties, .txt tên giống bảng) và từ BÊN TRONG pak Heaps (đọc tuần tự qua streamEntry nên chạy cả khi pak bị nén deflate trong IPA – manifest Dead Cells cho thấy res*.pak có csize < size).
+- Font trong pak: liệt kê + kiểm tra magic (ttf/otf/ttc/woff/woff2/bmfont) + tải pak_fonts.zip. Đọc family/độ phủ tiếng Việt của font này CHƯA làm (5.2/5.3 mới chạy cho font trong IPA/Unity).
+- Xuất: texts.csv (container,file,format,lang,key,text,confidence,placeholders,context; BOM UTF-8), texts_index.json. Validate nhẹ: placeholder, độ tin cậy (low = giống ID/đường dẫn), khóa trùng, file bỏ qua + lý do.
+- KHÔNG làm (ghi trong result.unsupported/limitations): Unity (I2/TextAsset/bundle), Unreal locres/pak, Godot pck, Cocos, dữ liệu mã hóa. Bố cục Heaps PAK là [HYPOTHESIS], chưa đối chiếu pak thật; nếu mọi file text trong pak không giải mã được → cảnh báo bố cục sai.
+- Test: tests/make_text_ipas.py + run_text_tests.js (31 ca, GIẢ LẬP). Các bộ cũ giữ nguyên: 359/112/86/76/217/141 + candidates 47 + pakheads 17 (các bộ metadata/literal/tables/fontmetrics/tmp/unity-test khác chưa chạy lại ở bản này).
+- Người dùng: chạy trang trên IPA Dead Cells thật → gửi texts_index.json + pak_heads.zip để đối chiếu.

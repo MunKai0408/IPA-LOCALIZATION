@@ -42,7 +42,7 @@
                            analysis_branch: r.engine.analysis_branch, version: r.engine.version } : null,
       stats: Object.assign({}, s.stats, { totalFiles: r.manifest ? r.manifest.summary.totalFiles : r.zip.fileCount, fontCount: r.fonts && r.fonts.summary ? r.fonts.summary.fonts_valid : null }),
       manifest: r.manifest ? { summary: r.manifest.summary, options: r.manifest.options, generatedAt: r.manifest.generatedAt } : null,
-      results: Object.assign({}, s.results, { ipa: r, engine: r.engine || null, manifest: r.manifest || null, unity: r.unity || null, fonts: r.fonts || null, fontFiles: r.font_files || null, unityfs: r.unityfs || null, serialized: r.serialized || null, fontMetrics: r.font_metrics || null, tmpFonts: r.tmp_fonts || null, candidates: r.candidates || null, serializedFiles: r.serialized_files || null, reportEngine: r.engine ? NS.DetectEngine.toReportFields(r.engine) : null })
+      results: Object.assign({}, s.results, { ipa: r, engine: r.engine || null, manifest: r.manifest || null, unity: r.unity || null, fonts: r.fonts || null, fontFiles: r.font_files || null, unityfs: r.unityfs || null, serialized: r.serialized || null, fontMetrics: r.font_metrics || null, tmpFonts: r.tmp_fonts || null, candidates: r.candidates || null, pakHeads: r.pak_heads || null, texts: r.texts || null, serializedFiles: r.serialized_files || null, reportEngine: r.engine ? NS.DetectEngine.toReportFields(r.engine) : null })
     });
     r.warnings.forEach(function (w) { /* đã log trong IpaReader qua hook */ });
     L.success('Phase 1–4.3 hoàn tất: đã đọc cấu trúc IPA, nhận diện engine, quét file, dò thành phần Unity, kiểm tra header metadata, trích xuất string literal, assembly/class/method/field và phát hiện/trích xuất font (Phase 5.1)', { module: 'events', step: 'read', details: { bundleId: r.app.bundleId, files: r.zip.fileCount, arch: r.architectures } });
@@ -193,6 +193,29 @@
     $('#btn-candidates-json').addEventListener('click', function () {
       const c = S.get().session.results.candidates; if (!c) { UI.toast('Chưa có kết quả hệ ứng viên', 'warning'); return; }
       dl('candidates.json', JSON.stringify(NS.Candidates.toIndex(c), null, 2), 'application/json;charset=utf-8');
+    });
+    $('#btn-texts-csv').addEventListener('click', function () {
+      const t = S.get().session.results.texts; if (!t || !t.rows.length) { UI.toast('Chưa có text trích xuất', 'warning'); return; }
+      dl('texts.csv', NS.TextExtract.toCsv(t), 'text/csv;charset=utf-8');
+    });
+    $('#btn-texts-json').addEventListener('click', function () {
+      const t = S.get().session.results.texts; if (!t) { UI.toast('Chưa có kết quả trích xuất', 'warning'); return; }
+      dl('texts_index.json', JSON.stringify(NS.TextExtract.toIndex(t), null, 2), 'application/json;charset=utf-8');
+    });
+    $('#btn-pakfonts-zip').addEventListener('click', function () {
+      const t = S.get().session.results.texts, ff = t ? NS.TextExtract.fontFiles(t) : [];
+      if (!ff.length) { UI.toast('Không có font trong pak để tải', 'warning'); return; }
+      dl('pak_fonts.zip', NS.PakHeads.buildZip(ff.map(function (f) { return { name: 'pak_fonts/' + f.name, data: f.data }; })), 'application/zip');
+    });
+    $('#btn-pak-json').addEventListener('click', function () {
+      const p = S.get().session.results.pakHeads; if (!p || !p.pak_files.length) { UI.toast('Chưa có kết quả file .pak', 'warning'); return; }
+      dl('pak_heads.json', JSON.stringify(NS.PakHeads.toIndex(p), null, 2), 'application/json;charset=utf-8');
+    });
+    $('#btn-pak-zip').addEventListener('click', function () {
+      const p = S.get().session.results.pakHeads; if (!p || !p.pak_files.length) { UI.toast('Chưa có kết quả file .pak', 'warning'); return; }
+      const files = NS.PakHeads.headFiles(p).map(function (f) { return { name: 'pak_heads/' + f.name, data: f.data }; });
+      files.push({ name: 'pak_heads/summary.json', data: new TextEncoder().encode(JSON.stringify(NS.PakHeads.toIndex(p), null, 2)) });
+      dl('pak_heads.zip', NS.PakHeads.buildZip(files), 'application/zip');
     });
     $('#btn-tmp-json').addEventListener('click', function () {
       const f = S.get().session.results.tmpFonts; if (!f) { UI.toast('Chưa có kết quả TMP_FontAsset', 'warning'); return; }

@@ -590,6 +590,33 @@
       warn('Đọc TMP_FontAsset thất bại: ' + ((e && e.message) || e));
       step('tmp', 'error', (e && e.message) || 'Lỗi');
     }
+    /* --- Bước 13b: đầu file .pak (thay extract_pak_heads.py). Lỗi chỉ thành cảnh báo. --- */
+    step('pakheads', 'running', 'Đọc phần đầu các file .pak');
+    try {
+      if (!NS.PakHeads) throw new IpaError('NO_PAKHEADS_MODULE', 'Thiếu module pak_heads.js');
+      const pr = await NS.PakHeads.run(file, entries, { isCancelled: cancelled });
+      result.pak_heads = pr;
+      pr.warnings.forEach(function (w) { warn(w); });
+      step('pakheads', 'done', pr.status === 'no_pak' ? 'Không có file .pak' : pr.reason);
+    } catch (e) {
+      if (e && e.code === 'CANCELLED') throw e;
+      warn('Đọc đầu file .pak thất bại: ' + ((e && e.message) || e));
+      step('pakheads', 'error', (e && e.message) || 'Lỗi');
+    }
+    /* --- Bước 13c: trích xuất text (IPA + pak Heaps) và font trong pak. Lỗi chỉ thành cảnh báo. --- */
+    step('texts', 'running', 'Trích xuất text và font');
+    try {
+      if (!NS.TextExtract) throw new IpaError('NO_TEXT_MODULE', 'Thiếu module text_extract.js');
+      const tx = await NS.TextExtract.run(file, entries, result, { isCancelled: cancelled });
+      result.texts = tx;
+      tx.warnings.forEach(function (w) { warn(w); });
+      log(tx.status === 'ok' ? 'SUCCESS' : 'INFO', 'Trích xuất text: ' + tx.reason, tx.summary);
+      step('texts', 'done', tx.status === 'ok' ? tx.reason : 'Không trích được text');
+    } catch (e) {
+      if (e && e.code === 'CANCELLED') throw e;
+      warn('Trích xuất text thất bại: ' + ((e && e.message) || e));
+      step('texts', 'error', (e && e.message) || 'Lỗi');
+    }
     /* --- Bước 14: hệ ứng viên chứa text (Phase 6, sub-phase 6.1): thuần dữ liệu, mọi engine. Lỗi chỉ thành cảnh báo. --- */
     step('candidates', 'running', 'Liệt kê hệ ứng viên chứa text');
     try {

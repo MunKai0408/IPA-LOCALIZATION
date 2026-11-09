@@ -28,6 +28,8 @@
       <button class="nav-item" data-view="engine"><span class="nav-icon" aria-hidden="true">⚙</span>Engine</button>
       <button class="nav-item" data-view="explorer"><span class="nav-icon" aria-hidden="true">🗂</span>File Explorer</button>
       <button class="nav-item" data-view="fonts"><span class="nav-icon" aria-hidden="true">Aa</span>Font</button>
+      <button class="nav-item" data-view="texts"><span class="nav-icon" aria-hidden="true">Aa</span>Text trích xuất</button>
+      <button class="nav-item" data-view="pakheads"><span class="nav-icon" aria-hidden="true">▤</span>File .pak</button>
       <button class="nav-item" data-view="candidates"><span class="nav-icon" aria-hidden="true">◎</span>Hệ ứng viên</button>
       <button class="nav-item" data-view="text"><span class="nav-icon" aria-hidden="true">✎</span>Văn bản</button>
       <button class="nav-item" data-view="localization"><span class="nav-icon" aria-hidden="true">🌐</span>Localization</button>
@@ -175,6 +177,32 @@
         </div>
       </section>
 
+      <!-- Text & font trích xuất -->
+      <section class="view" id="view-texts" hidden>
+        <div class="card empty" id="texts-empty">
+          <div class="empty-icon" aria-hidden="true">Aa</div>
+          <h2>Text trích xuất</h2>
+          <p>Chưa có kết quả. Tải IPA rồi bấm Bắt đầu phân tích. Trang trích text từ .strings/.stringsdict/.xcstrings/JSON/CSV/PO/XML… trong IPA và trong pak Heaps (kèm font trong pak). Mọi xử lý chạy trên máy bạn.</p>
+        </div>
+        <div id="texts-detail" hidden>
+          <div class="toolbar"><span class="spacer"></span><button class="btn btn-sm" id="btn-texts-csv" type="button">Tải texts.csv</button><button class="btn btn-sm" id="btn-texts-json" type="button">Tải texts_index.json</button><button class="btn btn-sm" id="btn-pakfonts-zip" type="button">Tải pak_fonts.zip</button></div>
+          <div class="card mt-3" id="texts-body"></div>
+        </div>
+      </section>
+
+      <!-- File .pak: đầu file + danh mục (thay extract_pak_heads.py) -->
+      <section class="view" id="view-pakheads" hidden>
+        <div class="card empty" id="pak-empty">
+          <div class="empty-icon" aria-hidden="true">▤</div>
+          <h2>File .pak</h2>
+          <p>Chưa có kết quả. Tải IPA ở mục “Phân tích IPA” rồi bấm Bắt đầu phân tích. Trang lấy phần đầu mỗi file .pak ngay trên máy bạn (không giải nén cả IPA, không gửi dữ liệu đi đâu) và đọc thử danh mục file bên trong.</p>
+        </div>
+        <div id="pak-detail" hidden>
+          <div class="toolbar"><span class="spacer"></span><button class="btn btn-sm" id="btn-pak-json" type="button">Tải pak_heads.json</button><button class="btn btn-sm" id="btn-pak-zip" type="button">Tải pak_heads.zip</button></div>
+          <div class="card mt-3" id="pak-body"></div>
+        </div>
+      </section>
+
       <!-- Phase 6.1: hệ ứng viên chứa text (mọi engine) -->
       <section class="view" id="view-candidates" hidden>
         <div class="card empty" id="candidates-empty">
@@ -225,6 +253,8 @@
 <script src="js/modules/serialized_file.js"></script>
 <script src="js/modules/font_metrics.js"></script>
 <script src="js/modules/tmp_font.js"></script>
+  <script src="js/modules/pak_heads.js"></script>
+  <script src="js/modules/text_extract.js"></script>
   <script src="js/modules/candidates.js"></script>
 <script src="js/ipa_reader.js"></script>
 <script src="js/worker_manager.js"></script>
