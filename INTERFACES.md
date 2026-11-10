@@ -552,3 +552,12 @@ Giải mã Texture2D atlas, liên kết component TextMeshPro → TMP_FontAsset,
 Ứng viên: `{id, engine, kind, level, paths[{path,size,lang}], languages[{code,slot,termCount|null}], componentRefs|null, ui_status, evidence, evidence_note, writable, risks[], notes[], detail, rank, suspected_secondary}`.
 Result: `{schema, sub_phase, status: ok|no_candidates|error|not_run, reason, engine, candidates[], detectors_run[], detector_errors[], gate0:{done:false}, summary, limitations[], warnings[]}`. `toIndex`, `toReportFields`.
 Xếp hạng: #ngôn ngữ ↓, tổng term ↓, componentRefs ↓, #file ↓; hệ ≤1 ngôn ngữ khi có hệ ≥2 ngôn ngữ → `suspected_secondary`.
+
+## 8.2 TranslationApply (`js/modules/translation_apply.js`, schema `translation_apply/1`) – chỉ luồng chính, nạp SAU text_extract.js
+`parseTranslationCsv(text) → {rows:[{line,container,file,format,lang,key,text,translation}], problems[]}` (cột bắt buộc: container,file,key,text + cột `translation`/`dịch`/`vi`; BOM, CRLF, ngoặc kép).
+`checkRow(orig, tr) → [{level:'error'|'warning', msg}]`: lỗi = thiếu/thừa/nhiều hơn placeholder (đếm theo số lần), ký tự điều khiển; cảnh báo = khác số dòng, khoảng trắng đầu/cuối, dài >2,5 lần.
+`validate(rows)`: gắn `status` (skip|ok|warning|error) + `issues`, trả tổng.
+`applyFile({path,data}, items) → {data|null, applied, failed[{key,reason}], reason?}`: ghi .strings(text)/.json/.cdb(localizable)/.xcstrings(localization có sẵn)/.po/.properties/.csv/.tsv/.txt; giữ mã hóa+BOM+EOL. Từ chối: xml, plist, stringsdict, JSON có số ≥16 chữ số. **Kiểm lại bắt buộc**: đọc file mới bằng `TextExtract.extractBytes`, từng dòng phải bằng bản dịch (nếu đã áp) hoặc bản gốc; lệch → `data=null`. Bản gốc trong file ≠ cột `text` CSV → dòng đó không áp.
+`build(texts, csvText, {force}) → {files:[{name,data}], report}`: file đã vá `translated/<ipa|pak>/…`, `patch_plan.json` (sha256, kích thước, pak_data_offset; pak cần dựng lại), `apply_report.json`, `HUONG_DAN.txt`. Dòng lỗi placeholder bị chặn trừ khi `force`. Dòng `raw:` không áp.
+`TextExtract` bổ sung: `parseStringsText` rows có `vs/ve`; `parseCdb(s, setter)` trả thêm `json`; export thêm `splitCsv, csvEscape, parseXcstrings, parseJsonWalk, parseProperties, decode, extOf`.
+UI: nút `#btn-apply-csv` + `#apply-csv-input` (view Text trích xuất) → tải `translated.zip`. Chưa có: ghi vào pak/IPA, xml, thêm localization mới vào xcstrings.

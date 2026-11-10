@@ -1,24 +1,10 @@
-# NEXT_TASK
+# NEXT_TASK (sau v0.18.0-apply)
 
-Giao cho: dev (bất kỳ account). Mục tiêu: Subphase READY tiếp theo theo ROADMAP (đề xuất 7.1 Native iOS hoặc 6.2 bộ dò chuỗi chung).
+Mục tiêu: một trong các việc READY (chọn 1, không viết lại phần cũ):
+1. **Dựng lại pak Heaps** từ translated/ + patch_plan.json (ghi pak mới, cây offset mới) – cần log/pak thật của Dead Cells để đối chiếu bố cục; làm trong trang hoặc tools/apply_patch.py.
+2. Ghi xml/plist; 7.4 Godot; 7.3 Cocos; 6.2 bộ dò chuỗi chung.
+3. Bộ sinh font Việt (bitmap atlas/TTF) dựa font_inventory.
 
-## ĐẦU VÀO BẮT BUỘC
-- Zip dự án v0.14.0-phase6.1 + HANDOFF.md + ROADMAP.md; prompt PROMPT_NANG_CAP_STUDIO_MOI_ENGINE_V1.
-- Chạy `node --check` mọi .js; sinh IPA giả (make_*.py + make_candidates_ipas.py); 12 bộ test phải đạt: 359/112/86/72/53/314/76/217/141/120/297 + candidates 47.
-
-## Các bước
-1. Chọn 1 Subphase READY (không làm lại 6.1). Thêm detector/parser dạng module độc lập + tests/make_<ten>_ipas.py + tests/run_<ten>_tests.js.
-2. Giữ bất biến nhãn bằng chứng; parser không chắc → unknown + diagnostics.
-3. Cập nhật README (mục "Cập nhật"), INTERFACES.md, HANDOFF.md, ROADMAP.md, NEXT_TASK.md; tăng NS.VERSION; zip + MANIFEST (SHA256).
-
-## Tiêu chí xong
-- Test mới đạt, 12 bộ cũ không đổi số ca; ROADMAP đúng trạng thái.
-
-## Không được làm
-- Viết lại Phase 0–5.3; thêm backend/thư viện ngoài; vượt DRM; tuyên bố đã kiểm trên game thật khi chưa có JSON từ người dùng.
-
-## Người dùng (một việc, không chặn dev)
-- Chạy trang trên IPA thật (máy tính, chế độ Nhanh), tải `candidates.json` + `manifest.csv` + `unity_info.json` gửi lại để đối chiếu.
-
-## Điểm dừng an toàn
-- Sau mỗi Subphase xong test + cập nhật 4 tài liệu.
+Đầu vào bắt buộc: zip v0.18.0 + HANDOFF.md + ROADMAP.md; `node --check` mọi .js; sinh IPA giả bằng mọi tests/make_*.py vào CÙNG 1 thư mục; 18 bộ test phải đạt (359/112/86/72/53/314/76/217/141/120/297 + candidates 47, pakheads 24, text 39, raw 20, apply 32).
+Không được làm: vượt DRM; tuyên bố đã kiểm trên game thật khi chưa có dữ liệu thật; thêm backend/thư viện ngoài.
+Người dùng: chạy trang trên IPA thật, dịch thử 1–2 dòng trong texts.csv, bấm nhập bản dịch, gửi translated.zip/apply_report.json + pak_heads.zip để đối chiếu.

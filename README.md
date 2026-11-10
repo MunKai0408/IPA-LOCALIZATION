@@ -127,3 +127,8 @@ View mới **“Hệ ứng viên”** liệt kê mọi nơi có thể chứa tex
 Lưu ý: mọi ứng viên là **HYPOTHESIS/UNKNOWN** (chưa có Cổng 0); tên file không phải bằng chứng; trang không tự gán `[RUNTIME-OK]`. Số term chưa đọc (null). Mới kiểm bằng IPA GIẢ LẬP, chưa kiểm trên game thật.
 Kiểm thử: `python3 tests/make_candidates_ipas.py /tmp/fake_ipas && node tests/run_candidates_tests.js /tmp/fake_ipas   # 47`.
 Việc dở cũ đã hủy: xem `docs/archive/`. Kế hoạch mới: `ROADMAP.md`.
+
+## Cập nhật 0.18.0 (nhập bản dịch)
+Trong view **Text trích xuất**: tải `texts.csv`, thêm cột `translation` (bản dịch), bấm **Nhập bản dịch (CSV) → file đã dịch**. Trang kiểm placeholder (`%s`, `{0}`, `::x::`…; thiếu/thừa = chặn dòng đó), ghi bản dịch vào đúng file gốc (.strings, .json, .cdb, .xcstrings, .po, .properties, .csv, .txt), **đọc lại từng file đã vá** để chắc chỉ các dòng dịch thay đổi, rồi tải `translated.zip` (file đã dịch + `patch_plan.json` + `apply_report.json`).
+Giới hạn: chưa ghi vào pak/IPA (patch_plan cho biết cần dựng lại pak vì kích thước đổi, IPA cần ký lại); chưa hỗ trợ xml/plist/dòng quét thô; chữ Việt cần font game hỗ trợ. Mới kiểm bằng dữ liệu GIẢ LẬP.
+Test: `python3 tests/make_text_ipas.py D && node tests/run_apply_tests.js D   # 32`.

@@ -73,3 +73,10 @@
 ## v0.17.1-fontinv
 - THÊM font_inventory (texts_index.json, manifest gói dịch, UI): liệt kê trong pak các file font (.ttf/.otf/.fnt…) và ảnh atlas font bitmap (cùng tên với .fnt, hoặc đường dẫn có font/glyph/charset); các file này (≤ 6 MB) vào gói dịch để dựng font tiếng Việt thay thế. Test text 36→39.
 - CHƯA có: bộ sinh font Việt (bitmap/TTF) – cần danh sách atlas thật của Dead Cells từ lần chạy mới.
+
+
+## v0.18.0-apply
+- THÊM js/modules/translation_apply.js (nhập CSV dịch → validate placeholder → vá file gốc → kiểm lại bằng extractBytes → translated.zip + patch_plan.json + apply_report.json). Nút `#btn-apply-csv`. Sửa nhẹ text_extract: spans `vs/ve` cho .strings, `parseCdb(s, setter)`, export thêm hàm.
+- Test: tests/run_apply_tests.js 32 ca (GIẢ LẬP; dùng IPA của make_text_ipas.py). 17 bộ cũ giữ nguyên (chạy chung 1 thư mục: tất cả make_*.py vào cùng DIR rồi mọi run_*).
+- NEXT_TASK cũ (0.14.0) đã lỗi thời: đã thay.
+- CHƯA có: ghi lại vào pak Heaps/IPA (dựng pak + zip + ký), xml/plist, xcstrings thêm localization mới, font Việt. UI nút chưa thử trong trình duyệt thật (chỉ node --check + logic).

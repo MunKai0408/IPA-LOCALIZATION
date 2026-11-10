@@ -68,7 +68,7 @@
     while (i < n) {
       ws(); if (i >= n) break;
       const k = str(); ws();
-      if (k !== null && s[i] === '=') { i++; ws(); const v = str(); ws(); if (s[i] === ';') i++; if (v === null) bad++; else rows.push({ key: k, text: v }); }
+      if (k !== null && s[i] === '=') { i++; ws(); const vs = i, v = str(), ve = i; ws(); if (s[i] === ';') i++; if (v === null) bad++; else rows.push({ key: k, text: v, vs: vs, ve: ve }); }   // vs/ve: khoảng giá trị trong chuỗi gốc (cho translation_apply)
       else { bad++; const j = s.indexOf(';', i); i = j < 0 ? n : j + 1; }
     }
     return { rows: rows, bad: bad };
@@ -114,7 +114,7 @@
     return { rows: rows, bad: 0 };
   }
   /** CastleDB (.cdb): chỉ lấy các cột có kind="localizable" (game tự đánh dấu cột cần dịch), kể cả sheet con "cha@cột". Trả null nếu không phải CDB. */
-  function parseCdb(s) {
+  function parseCdb(s, setter) {   // setter(key, text) → chuỗi mới hoặc undefined (dùng cho translation_apply); r.json = đối tượng đã (có thể) sửa
     let j; try { j = JSON.parse(s); } catch (_) { return null; }
     if (!j || !Array.isArray(j.sheets)) return null;
     const by = {}; j.sheets.forEach(function (sh) { if (sh && sh.name) by[sh.name] = sh; });
@@ -125,7 +125,7 @@
       const lc = locCols(sh);
       (sh.columns || []).forEach(function (c) {
         if (!c || !c.name) return; const v = line[c.name];
-        if (lc[c.name]) { nCols++; if (typeof v === 'string' && v !== '') rows.push({ key: prefix + '.' + c.name, text: v, ctx: 'CDB localizable' }); return; }
+        if (lc[c.name]) { nCols++; if (typeof v === 'string' && v !== '') { const k = prefix + '.' + c.name; rows.push({ key: k, text: v, ctx: 'CDB localizable' }); if (setter) { const nv = setter(k, v); if (typeof nv === 'string') line[c.name] = nv; } } return; }
         if (Array.isArray(v)) { const sub = by[sh.name + '@' + c.name]; if (sub) v.forEach(function (x, i) { walkLine(sub, x, prefix + '.' + c.name + '[' + (x && x.id ? x.id : i) + ']', depth + 1); }); }
       });
     }
@@ -133,7 +133,7 @@
       if (!sh || !sh.name || sh.name.indexOf('@') >= 0 || !Array.isArray(sh.lines)) return;
       sh.lines.forEach(function (line, i) { walkLine(sh, line, sh.name + '[' + (line && line.id ? line.id : i) + ']', 0); });
     });
-    return { rows: rows, bad: 0 };
+    return { rows: rows, bad: 0, json: j };
   }
   function splitCsv(s, delim) {
     const out = []; let row = [], cell = '', q = false;
@@ -414,6 +414,6 @@
   }
   function fontFiles(r) { return (r._fontBlobs || []).slice(); }
 
-  NS.TextExtract = { SCHEMA: SCHEMA, LIMITS: LIMITS, run: run, extractBytes: extractBytes, parseCdb: parseCdb, parseStringsText: parseStringsText, parseXml: parseXml, parsePo: parsePo, parseCsv: parseCsv,
+  NS.TextExtract = { SCHEMA: SCHEMA, LIMITS: LIMITS, run: run, extractBytes: extractBytes, parseCdb: parseCdb, parseStringsText: parseStringsText, parseXml: parseXml, parsePo: parsePo, parseCsv: parseCsv, splitCsv: splitCsv, csvEscape: csvEscape, parseXcstrings: parseXcstrings, parseJsonWalk: parseJsonWalk, parseProperties: parseProperties, decode: decode, extOf: extOf,
     placeholders: placeholders, confidence: confidence, fontMagic: fontMagic, toCsv: toCsv, toPack: toPack, toIndex: toIndex, fontFiles: fontFiles };
 })(typeof window !== 'undefined' ? window : self);
