@@ -203,20 +203,18 @@
     });
     $('#btn-apply-csv').addEventListener('click', function () {
       const t = S.get().session.results.texts;
-      if (!t || !t._src || !t._src.length) { UI.toast('Chưa có file gốc trong phiên này – hãy phân tích IPA trước', 'warning'); return; }
+      if (!t || !t.rows.length) { UI.toast('Chưa có text trích xuất', 'warning'); return; }
       $('#apply-csv-input').click();
     });
     $('#apply-csv-input').addEventListener('change', function (ev) {
       const f = ev.target.files && ev.target.files[0]; ev.target.value = ''; if (!f) return;
-      const t = S.get().session.results.texts;
-      f.text().then(function (txt) {
-        const b = NS.TranslationApply.build(t, txt, {}), r = b.report;
-        if (r.status === 'invalid_csv') { UI.toast('CSV không hợp lệ: ' + r.problems.join('; '), 'error'); return; }
-        if (r.status !== 'ok') { UI.toast('Không áp dụng được dòng nào (' + r.errors.length + ' lỗi placeholder)', 'warning'); }
-        else UI.toast('Đã áp dụng ' + r.summary.applied_rows + ' dòng vào ' + r.summary.files_applied + ' file; ' + r.errors.length + ' dòng lỗi placeholder bị chặn, ' + r.summary.files_not_applied + ' file không áp dụng', r.errors.length ? 'warning' : 'success');
-        L.info('Nhập bản dịch', { module: 'translation_apply', step: 'build', details: r.summary });
-        dl('translated.zip', NS.PakHeads.buildZip(b.files), 'application/zip');
-      }).catch(function (e) { UI.toast('Lỗi đọc CSV: ' + ((e && e.message) || e), 'error'); });
+      f.text().then(function (txt) { NS.UI_importTranslations(txt); }).catch(function (e) { UI.toast('Lỗi đọc CSV: ' + ((e && e.message) || e), 'error'); });
+    });
+    $('#btn-apply-now').addEventListener('click', function () { NS.UI_applyTranslations(); });
+    $('#btn-translated-csv').addEventListener('click', function () { NS.UI_exportTranslated(); });
+    $('#btn-loc-json').addEventListener('click', function () {
+      const t = S.get().session.results.texts; if (!t || !t.rows.length) { UI.toast('Chưa có text trích xuất', 'warning'); return; }
+      dl('localization.json', JSON.stringify(NS.Localization.toIndex(NS.Localization.analyze(t)), null, 2), 'application/json');
     });
     $('#btn-texts-csv').addEventListener('click', function () {
       const t = S.get().session.results.texts; if (!t || !t.rows.length) { UI.toast('Chưa có text trích xuất', 'warning'); return; }

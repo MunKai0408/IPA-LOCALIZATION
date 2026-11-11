@@ -201,6 +201,30 @@
     return res({ data: data, applied: ap.size });
   }
 
+  /* ---------- trình soạn trong trang: map = {chỉ số dòng trong texts.rows → bản dịch} ---------- */
+  const rk = function (r) { return r.container + '\u0000' + r.file + '\u0000' + r.key; };
+  /** texts.csv + cột translation (từ map). Dòng chưa dịch để trống. */
+  function toTranslatedCsv(texts, map) {
+    const E = TE().csvEscape, cols = ['container', 'file', 'format', 'lang', 'key', 'text', 'confidence', 'placeholders', 'context', 'translation'];
+    const lines = [cols.join(',')];
+    texts.rows.forEach(function (x, i) { lines.push([x.container, x.file, x.format, x.lang, x.key, x.text, x.confidence, x.placeholders.join(' '), x.context, map && map[i] !== undefined ? map[i] : ''].map(E).join(',')); });
+    return '\uFEFF' + lines.join('\r\n') + '\r\n';
+  }
+  /** Nạp CSV dịch vào map theo (container,file,key) + thứ tự xuất hiện; text gốc phải trùng. Trả {map, matched, unmatched[{line,reason}]}. */
+  function mergeCsv(texts, csvText) {
+    const pr = parseTranslationCsv(csvText), res = { map: {}, matched: 0, unmatched: [], problems: pr.problems };
+    if (pr.problems.length) return res;
+    const idx = new Map(); texts.rows.forEach(function (r, i) { const k = rk(r); if (!idx.has(k)) idx.set(k, []); idx.get(k).push(i); });
+    pr.rows.forEach(function (c) {
+      if (c.translation === '' || c.translation === c.text) return;
+      const q = idx.get(rk(c)); if (!q || !q.length) { res.unmatched.push({ line: c.line, reason: 'không có dòng này trong phiên hiện tại' }); return; }
+      const i = q.shift(), orig = texts.rows[i].text;
+      if (orig !== c.text) { res.unmatched.push({ line: c.line, reason: 'cột text khác bản gốc của phiên này' }); return; }
+      res.map[i] = c.translation; res.matched++;
+    });
+    return res;
+  }
+
   /* ---------- toàn bộ ---------- */
   function sha(u8) { try { const h = NS.Hash.create('sha256'); h.update(u8); return h.hex(); } catch (_) { return null; } }
   /** texts: kết quả TextExtract.run (cần _src). csvText: nội dung CSV đã dịch. opts: {force:false} → force=true áp cả dòng lỗi placeholder. */
@@ -239,5 +263,5 @@
     return { files: files, report: rep };
   }
 
-  NS.TranslationApply = { SCHEMA: SCHEMA, parseTranslationCsv: parseTranslationCsv, validate: validate, checkRow: checkRow, applyFile: applyFile, build: build };
+  NS.TranslationApply = { SCHEMA: SCHEMA, parseTranslationCsv: parseTranslationCsv, validate: validate, checkRow: checkRow, applyFile: applyFile, build: build, toTranslatedCsv: toTranslatedCsv, mergeCsv: mergeCsv };
 })(typeof window !== 'undefined' ? window : self);

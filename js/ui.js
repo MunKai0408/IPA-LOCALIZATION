@@ -13,7 +13,7 @@
     pakheads:     { title: 'File .pak',      icon: '▤', phase: 6 },
     candidates:   { title: 'Hệ ứng viên',    icon: '◎', phase: 6 },
     text:         { title: 'Văn bản',        icon: '✎', phase: 6, empty: 'Chưa có chuỗi nào được trích xuất.' },
-    localization: { title: 'Localization',   icon: '🌐', phase: 6, empty: 'Chưa có bảng ngôn ngữ nào được nhận diện.' },
+    localization: { title: 'Localization',   icon: '🌐', phase: 6 },
     runtime:      { title: 'Runtime Strings',icon: '⏱', phase: 7, empty: 'Chưa nhập runtime_strings.jsonl. Website không thể hook game; chỉ nhập dữ liệu do công cụ runtime bên ngoài tạo.' },
     metadata:     { title: 'Unity / Metadata', icon: '🧬', phase: 4 },
     report:       { title: 'Báo cáo',        icon: '📄', phase: 9, empty: 'Báo cáo sẽ được tạo từ kết quả phân tích thật sau khi hoàn tất.' },
@@ -179,6 +179,7 @@
     renderCandidates(s);
     renderPakHeads(s);
     renderTexts(s);
+    renderLocalization(s);
   }
 
   /* ---------- Lỗi + chi tiết ứng dụng ---------- */
@@ -549,7 +550,7 @@
   const FONT_ST = { extracted: 'Đã trích xuất', not_font_content: 'Nội dung không phải font', skipped_too_large: 'Bỏ qua: quá lớn', skipped_budget: 'Bỏ qua: hết hạn mức bộ nhớ', read_error: 'Lỗi đọc',
     unsafe_path: 'Đường dẫn không an toàn', symlink_not_followed: 'Symlink', encrypted_zip: 'Entry mã hóa ZIP', unsupported_method: 'Nén chưa hỗ trợ', pending: 'Chờ' };
   const FONT_RES = { ok: ['Hoàn tất', 'success'], no_fonts: ['Không tìm thấy font', 'warning'], partial: ['Hoàn tất một phần', 'warning'], error: ['Lỗi', 'danger'], not_run: ['Chưa chạy', ''] };
-  let lastFonts = null, lastFontMetrics = null, lastTmp = null;
+  let lastFonts = null, lastFontMetrics = null, lastTmp = null, lastPakFonts = null;
   function saveBlob(name, data, type) {
     const url = URL.createObjectURL(new Blob([data], { type: type || 'application/octet-stream' }));
     const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
@@ -583,6 +584,7 @@
     const scroll = h('div', { class: 'table-wrap' }); scroll.appendChild(tbl); box.appendChild(scroll);
     if (c.candidates.length > 200) box.appendChild(h('p', { text: 'Chỉ hiện 200 ứng viên đầu; tải candidates.json để xem đủ.' }));
   }
+  const State = function () { return NS.State.get(); };
   let lastTexts = null;
   function renderTexts(s) {
     const t = (s.results && s.results.texts) || null;
@@ -603,12 +605,131 @@
     (t.warnings || []).forEach(function (w) { box.appendChild(h('p', { class: 'badge warning', text: w })); });
     (t.unsupported || []).forEach(function (u) { box.appendChild(h('p', { class: 'badge', text: 'Chưa hỗ trợ: ' + u.file + ' – ' + u.reason })); });
     if (!t.rows.length) return;
-    const tbl = h('table', { class: 'tbl' });
-    tbl.appendChild(h('thead', {}, [h('tr', {}, ['Ng.ngữ', 'File', 'Khóa', 'Text'].map(function (x) { return h('th', { text: x }); }))]));
-    const tb = h('tbody');
-    t.rows.slice(0, 200).forEach(function (r) { tb.appendChild(h('tr', {}, [h('td', { text: r.lang || '—' }), h('td', { text: r.file }), h('td', { text: r.key }), h('td', { text: r.text.length > 160 ? r.text.slice(0, 160) + '…' : r.text })])); });
-    tbl.appendChild(tb); const sc = h('div', { class: 'table-wrap' }); sc.appendChild(tbl); box.appendChild(sc);
-    if (t.rows.length > 200) box.appendChild(h('p', { text: 'Chỉ hiện 200 dòng đầu; tải texts.csv để xem đủ ' + t.rows.length + ' dòng.' }));
+    box.appendChild(buildTranslationEditor(t));
+  }
+
+  /* ---- Trình soạn bản dịch (6): dịch ngay trong bảng, kiểm placeholder trực tiếp ---- */
+  let trMap = {}, trTexts = null, trRefresh = null;
+  function trCounts() {
+    const A = NS.TranslationApply; let done = 0, err = 0, warn = 0;
+    Object.keys(trMap).forEach(function (i) { const r = trTexts.rows[i]; done++; const is = A.checkRow(r.text, trMap[i]); if (is.some(function (x) { return x.level === 'error'; })) err++; else if (is.length) warn++; });
+    return { done: done, err: err, warn: warn };
+  }
+  function buildTranslationEditor(t) {
+    if (trTexts !== t) { trTexts = t; trMap = {}; }
+    const A = NS.TranslationApply, PAGE = 50; let page = 0, q = '', mode = 'all', fileSel = '';
+    const files = []; t.rows.forEach(function (r) { const k = r.container + ' | ' + r.file; if (files.indexOf(k) < 0) files.push(k); });
+    const input = h('input', { type: 'search', class: 'input', placeholder: 'Tìm khóa/text/bản dịch…', 'aria-label': 'Tìm text' });
+    const selMode = h('select', { class: 'input', 'aria-label': 'Lọc trạng thái' }, [['all', 'Tất cả'], ['todo', 'Chưa dịch'], ['done', 'Đã dịch'], ['bad', 'Có lỗi/cảnh báo']].map(function (o) { return h('option', { value: o[0], text: o[1] }); }));
+    const selFile = h('select', { class: 'input', 'aria-label': 'Lọc theo file' }, [h('option', { value: '', text: 'Mọi file (' + files.length + ')' })].concat(files.slice(0, 500).map(function (f) { return h('option', { value: f, text: f.length > 70 ? '…' + f.slice(-69) : f }); })));
+    const info = h('span', { class: 'dim' }), stat = h('span', { class: 'badge' }), prev = h('button', { class: 'btn btn-sm', type: 'button', text: '‹' }), next = h('button', { class: 'btn btn-sm', type: 'button', text: '›' });
+    const tbody = h('tbody'), table = h('table', { class: 'tbl' }, [h('thead', {}, [h('tr', {}, ['Ng.ngữ', 'File · Khóa', 'Bản gốc', 'Bản dịch', 'Kiểm tra'].map(function (x) { return h('th', { text: x }); }))]), tbody]);
+    const status = function (i) { const v = trMap[i]; if (v === undefined) return null; return A.checkRow(trTexts.rows[i].text, v); };
+    const badgeFor = function (iss, el) {
+      el.className = 'badge ' + (!iss ? '' : iss.some(function (x) { return x.level === 'error'; }) ? 'danger' : iss.length ? 'warning' : 'success');
+      el.textContent = !iss ? '—' : iss.length ? iss.map(function (x) { return x.msg; }).join('; ') : 'OK'; el.title = el.textContent;
+    };
+    const updStat = function () { const c = trCounts(); stat.textContent = 'Đã dịch ' + c.done + '/' + t.rows.length + (c.err ? ' · ' + c.err + ' lỗi' : '') + (c.warn ? ' · ' + c.warn + ' cảnh báo' : ''); stat.className = 'badge ' + (c.err ? 'danger' : c.done ? 'success' : ''); };
+    const draw = function () {
+      const ql = q.toLowerCase(), idx = [];
+      for (let i = 0; i < t.rows.length; i++) {
+        const r = t.rows[i]; if (fileSel && (r.container + ' | ' + r.file) !== fileSel) continue;
+        const v = trMap[i];
+        if (mode === 'todo' && v !== undefined) continue; if (mode === 'done' && v === undefined) continue;
+        if (mode === 'bad') { if (v === undefined) continue; const is = A.checkRow(r.text, v); if (!is.length) continue; }
+        if (ql && (r.key + ' ' + r.text + ' ' + r.file + ' ' + (v || '')).toLowerCase().indexOf(ql) < 0) continue;
+        idx.push(i);
+      }
+      const pages = Math.max(1, Math.ceil(idx.length / PAGE)); if (page >= pages) page = pages - 1;
+      tbody.replaceChildren();
+      idx.slice(page * PAGE, page * PAGE + PAGE).forEach(function (i) {
+        const r = t.rows[i], ta = h('textarea', { class: 'input', rows: String(Math.min(6, Math.max(2, r.text.split('\n').length))), 'aria-label': 'Bản dịch ' + r.key, spellcheck: 'false' }), bd = h('span', { class: 'badge' });
+        ta.value = trMap[i] !== undefined ? trMap[i] : ''; badgeFor(status(i), bd);
+        ta.addEventListener('input', function () { if (ta.value === '') delete trMap[i]; else trMap[i] = ta.value; badgeFor(status(i), bd); updStat(); });
+        const conf = r.confidence === 'low' ? ' (giống ID/đường dẫn)' : '';
+        tbody.appendChild(h('tr', {}, [h('td', { class: 'path', text: r.lang || '—' }), h('td', { class: 'path', text: r.file + ' · ' + r.key + conf }), h('td', { class: 'path', text: r.text.length > 400 ? r.text.slice(0, 400) + '…' : r.text }), h('td', {}, [ta]), h('td', {}, [bd])]));
+      });
+      info.textContent = idx.length + ' / ' + t.rows.length + ' dòng · trang ' + (page + 1) + '/' + pages; prev.disabled = page === 0; next.disabled = page >= pages - 1; updStat();
+    };
+    input.addEventListener('input', function () { q = input.value; page = 0; draw(); });
+    selMode.addEventListener('change', function () { mode = selMode.value; page = 0; draw(); });
+    selFile.addEventListener('change', function () { fileSel = selFile.value; page = 0; draw(); });
+    prev.addEventListener('click', function () { page--; draw(); }); next.addEventListener('click', function () { page++; draw(); });
+    trRefresh = draw; draw();
+    const sc = h('div', { class: 'table-wrap' }); sc.appendChild(table);
+    return h('div', { class: 'mt-3' }, [h('div', { class: 'toolbar' }, [input, selMode, selFile, prev, next, info, h('span', { class: 'spacer' }), stat]), sc]);
+  }
+  function trNeedRows() { const t = (State().session.results || {}).texts || null; return t && t.rows && t.rows.length ? t : null; }
+  NS.UI_importTranslations = function (csvText) {
+    const t = trNeedRows(); if (!t) { toast('Chưa có text trích xuất', 'warning'); return; }
+    if (trTexts !== t) { trTexts = t; trMap = {}; }
+    const r = NS.TranslationApply.mergeCsv(t, csvText);
+    if (r.problems.length) { toast('CSV không hợp lệ: ' + r.problems.join('; '), 'error', 7000); return; }
+    Object.keys(r.map).forEach(function (i) { trMap[i] = r.map[i]; });
+    toast('Đã nạp ' + r.matched + ' bản dịch' + (r.unmatched.length ? '; ' + r.unmatched.length + ' dòng không khớp (dòng đầu: CSV dòng ' + r.unmatched[0].line + ' – ' + r.unmatched[0].reason + ')' : ''), r.unmatched.length ? 'warning' : 'success', 7000);
+    if (trRefresh) trRefresh();
+  };
+  NS.UI_exportTranslated = function () {
+    const t = trNeedRows(); if (!t) { toast('Chưa có text trích xuất', 'warning'); return; }
+    saveBlob('texts_translated.csv', NS.TranslationApply.toTranslatedCsv(t, trMap), 'text/csv;charset=utf-8');
+  };
+  NS.UI_applyTranslations = function () {
+    const t = trNeedRows(); if (!t) { toast('Chưa có text trích xuất', 'warning'); return; }
+    if (!t._src || !t._src.length) { toast('Không còn file gốc trong phiên này – hãy phân tích lại IPA', 'warning'); return; }
+    if (!Object.keys(trMap).length) { toast('Chưa có bản dịch nào (dịch trong bảng hoặc nạp CSV)', 'warning'); return; }
+    const b = NS.TranslationApply.build(t, NS.TranslationApply.toTranslatedCsv(t, trMap), {}), r = b.report;
+    if (r.status !== 'ok') { toast('Không áp dụng được dòng nào (' + r.errors.length + ' lỗi placeholder; ' + r.files.length + ' file không ghi được)', 'warning', 7000); return; }
+    toast('Đã áp dụng ' + r.summary.applied_rows + ' dòng vào ' + r.summary.files_applied + ' file; ' + r.errors.length + ' dòng lỗi bị chặn; ' + r.summary.files_not_applied + ' file không ghi được', r.errors.length || r.summary.files_not_applied ? 'warning' : 'success', 7000);
+    saveBlob('translated.zip', NS.PakHeads.buildZip(b.files), 'application/zip');
+  };
+  /* ---- Localization: ngôn ngữ có trong game + so khớp nguồn → đích ---- */
+  let lastLocTexts = null, locAn = null, locSel = { source: null, target: 'vi', refs: {} };
+  function renderLocalization(s) {
+    const t = (s.results && s.results.texts) || null, cand = (s.results && s.results.candidates) || null;
+    if (t === lastLocTexts) return; lastLocTexts = t;
+    const box = $('#loc-body'), wrap = $('#loc-detail'), empty = $('#loc-empty'); if (!box || !wrap || !empty) return;
+    box.replaceChildren(); locAn = t && t.rows && t.rows.length ? NS.Localization.analyze(t) : null;
+    wrap.hidden = !locAn; empty.hidden = !!locAn; if (!locAn) return;
+    const L = NS.Localization, an = locAn; locSel = { source: an.base, target: 'vi', refs: {} };
+    const hasVi = an.languages.some(function (l) { return l.code === 'vi'; });
+    const kv = h('dl', { class: 'kv' });
+    kvRow(kv, 'Ngôn ngữ nhận ra', an.languages.length + ' (' + an.languages.map(function (l) { return l.code; }).join(', ') + ') · ' + an.unknown_lang_rows + ' dòng không rõ ngôn ngữ');
+    kvRow(kv, 'Tiếng Việt (vi)', hasVi ? 'Đã có trong game (' + an.languages.filter(function (l) { return l.code === 'vi'; })[0].keys + ' khóa)' : 'Chưa có trong text đã trích – cần dịch từ ngôn ngữ nguồn');
+    kvRow(kv, 'Lưu ý', 'Ghép “cùng khóa giữa các ngôn ngữ” là heuristic theo đường dẫn/khóa. Mẫu dịch sẽ ghi đè lên file của ngôn ngữ nguồn; chưa tạo được file ngôn ngữ mới (vd. vi.lproj).');
+    box.appendChild(kv);
+    const base = an.languages.filter(function (l) { return l.code === an.base; })[0];
+    box.appendChild(buildPagedTable(['Ngôn ngữ', 'Khóa', 'Dòng', 'File', 'So với ' + an.base, 'Định dạng'], an.languages, function (l) {
+      return [l.code, String(l.keys), String(l.rows), String(l.files), base && base.keys ? Math.round(l.keys * 100 / base.keys) + '%' : '—', l.formats.join(', ')];
+    }, function (l) { return l.code; }, 'Tìm ngôn ngữ'));
+    const cl = cand && cand.candidates ? cand.candidates.filter(function (c) { return c.languages && c.languages.length; }) : [];
+    if (cl.length) box.appendChild(listBlock('Bảng ngôn ngữ nhận diện bởi hệ ứng viên', cl.map(function (c) { return c.kind + ' (' + c.level + '): ' + c.languages.map(function (l) { return l.code + (l.termCount != null ? ' ×' + l.termCount : ''); }).join(', '); }), 100));
+    /* so khớp */
+    const codes = an.languages.map(function (l) { return l.code; }); if (codes.indexOf('vi') < 0) codes.push('vi');
+    const mkSel = function (label, val, cb) { const sel = h('select', { class: 'input', 'aria-label': label }, codes.map(function (c) { return h('option', { value: c, text: c }); })); sel.value = val; sel.addEventListener('change', function () { cb(sel.value); }); return sel; };
+    const out = h('div', { class: 'mt-3' }), refsBox = h('span', {});
+    const draw = function () {
+      out.replaceChildren(); const c = L.compare(t, an, locSel.source, locSel.target);
+      out.appendChild(h('h3', { class: 'section-title', text: 'So khớp ' + c.source + ' → ' + c.target }));
+      const k2 = h('dl', { class: 'kv' });
+      kvRow(k2, 'Khóa ở nguồn', c.source_keys); kvRow(k2, 'Đã có ở đích', c.present + (c.coverage_pct != null ? ' (' + c.coverage_pct + '%)' : ''));
+      kvRow(k2, 'Chưa có ở đích', c.missing.length); kvRow(k2, 'Có nhưng y nguyên nguồn (nghi chưa dịch)', c.identical.length); kvRow(k2, 'Chỉ có ở đích', c.extra_in_target);
+      out.appendChild(k2);
+      const refs = Object.keys(locSel.refs).filter(function (x) { return locSel.refs[x] && x !== c.source && x !== c.target; });
+      const mkBtn = function (label, idx, name) { const b = h('button', { class: 'btn btn-sm', type: 'button', text: label + ' (' + idx.length + ')' }); b.disabled = !idx.length; b.addEventListener('click', function () { saveBlob(name, L.toTemplateCsv(t, an, idx, refs), 'text/csv;charset=utf-8'); }); return b; };
+      out.appendChild(h('div', { class: 'toolbar' }, [mkBtn('Tải mẫu dịch: khóa chưa có', c.missing, 'localization_missing_' + c.target + '.csv'), mkBtn('Tải mẫu: khóa nghi chưa dịch', c.identical, 'localization_untranslated_' + c.target + '.csv'), mkBtn('Tải mẫu: cả hai', c.missing.concat(c.identical).sort(function (a, b) { return a - b; }), 'localization_all_' + c.target + '.csv')]));
+      const files = Object.keys(c.by_file).sort(function (a, b) { return c.by_file[b] - c.by_file[a]; });
+      if (files.length) out.appendChild(listBlock('Khóa chưa có ở đích, theo file', files.map(function (f) { return f + ' — ' + c.by_file[f]; }), 100));
+      out.appendChild(h('p', { class: 'dim', text: 'Dịch xong, mở “Text trích xuất” → “Nạp CSV đã dịch” → “Áp dụng bản dịch”.' }));
+    };
+    const drawRefs = function () {
+      refsBox.replaceChildren(); refsBox.appendChild(h('span', { class: 'dim', text: ' Tham khảo: ' }));
+      codes.filter(function (c2) { return c2 !== locSel.source && c2 !== locSel.target && an.languages.some(function (l) { return l.code === c2; }); }).forEach(function (c2) {
+        const cb = h('input', { type: 'checkbox', 'aria-label': 'Tham khảo ' + c2 }); cb.checked = !!locSel.refs[c2]; cb.addEventListener('change', function () { locSel.refs[c2] = cb.checked; draw(); });
+        refsBox.appendChild(h('label', { class: 'dim' }, [cb, document.createTextNode(' ' + c2 + '  ')]));
+      });
+    };
+    box.appendChild(h('div', { class: 'toolbar mt-3' }, [h('span', { class: 'dim', text: 'Nguồn' }), mkSel('Ngôn ngữ nguồn', locSel.source, function (v) { locSel.source = v; drawRefs(); draw(); }), h('span', { class: 'dim', text: '→ Đích' }), mkSel('Ngôn ngữ đích', locSel.target, function (v) { locSel.target = v; drawRefs(); draw(); }), refsBox]));
+    box.appendChild(out); drawRefs(); draw();
   }
   let lastPak = null;
   function renderPakHeads(s) {
@@ -638,10 +759,11 @@
   }
   function renderFonts(s) {
     const f = (s.results && s.results.fonts) || null, fmx = (s.results && s.results.fontMetrics) || null, tmx = (s.results && s.results.tmpFonts) || null;
-    if (f === lastFonts && fmx === lastFontMetrics && tmx === lastTmp) return; lastFonts = f; lastFontMetrics = fmx; lastTmp = tmx;
+    const tx0 = (s.results && s.results.texts) || null, pkx = tx0 && ((tx0.pak_fonts && tx0.pak_fonts.length) || (tx0.font_inventory && tx0.font_inventory.length)) ? tx0 : null;
+    if (f === lastFonts && fmx === lastFontMetrics && tmx === lastTmp && pkx === lastPakFonts) return; lastFonts = f; lastFontMetrics = fmx; lastTmp = tmx; lastPakFonts = pkx;
     const box = $('#fonts-body'), wrap = $('#fonts-detail'), empty = $('#fonts-empty'); if (!box || !wrap || !empty) return;
-    box.replaceChildren(); wrap.hidden = !f && !fmx && !tmx; empty.hidden = !!(f || fmx || tmx); if (!f && !fmx && !tmx) return;
-    if (!f) { const only = buildFontMetricsCard(fmx); if (only) box.appendChild(only); const ot = buildTmpCard(tmx); if (ot) box.appendChild(ot); return; }
+    box.replaceChildren(); wrap.hidden = !f && !fmx && !tmx && !pkx; empty.hidden = !!(f || fmx || tmx || pkx); if (!f && !fmx && !tmx && !pkx) return;
+    if (!f) { const only = buildFontMetricsCard(fmx); if (only) box.appendChild(only); const ot = buildTmpCard(tmx); if (ot) box.appendChild(ot); const op = buildPakFontsCard(pkx); if (op) box.appendChild(op); return; }
     const st = FONT_RES[f.status] || [f.status, ''], sm = f.summary || {};
     const kv = h('dl', { class: 'kv' });
     kv.appendChild(h('dt', { text: 'Trạng thái' })); kv.appendChild(h('dd', {}, [h('span', { class: 'badge ' + st[1], text: st[0] })]));
@@ -669,9 +791,92 @@
     box.appendChild(listBlock('Chưa làm ở sub-phase 5.1 (có chủ đích)', f.limitations));
     const fmCard = buildFontMetricsCard(fmx); if (fmCard) box.appendChild(fmCard);
     const tmCard = buildTmpCard(tmx); if (tmCard) box.appendChild(tmCard);
+    const pkCard = buildPakFontsCard(pkx); if (pkCard) box.appendChild(pkCard);
   }
   NS.UI_saveBlob = saveBlob;
 
+  /* Thẻ font trong pak (nguồn: bước Text): TTF/OTF/WOFF qua FontMetrics, BMFont qua danh sách ký tự. Chỉ nói font CÓ glyph/ký tự tiếng Việt, không nói game dùng font nào. */
+  const VI_LV = { full: ['Đủ', 'success'], partial: ['Thiếu một phần', 'warning'], none: ['Không có', 'danger'], unknown: ['Không rõ', ''] };
+  function buildPakFontsCard(t) {
+    if (!t) return null;
+    const card = h('div', { class: 'card mt-3' }, [h('h2', { class: 'section-title', text: 'Font trong file .pak – độ phủ tiếng Việt' })]);
+    const pf = t.pak_fonts || [], vi = (t.summary && t.summary.pak_fonts_vi) || { full: 0, partial: 0, none: 0 };
+    if (pf.length) {
+      const kv = h('dl', { class: 'kv' });
+      kvRow(kv, 'Tổng quan', pf.length + ' font · đủ tiếng Việt ' + vi.full + ' · thiếu một phần ' + vi.partial + ' · không có ' + vi.none + ' · không đọc được ' + (pf.length - vi.full - vi.partial - vi.none));
+      kvRow(kv, 'Ý nghĩa', '“Đủ” = có glyph/ký tự cho cả 134 chữ Việt có dấu dựng sẵn. Font có thể không phải font game thật sự dùng; BMFont chỉ đếm ký tự khai báo trong .fnt (không kiểm ảnh atlas).');
+      card.appendChild(kv);
+      card.appendChild(buildPagedTable(['Font trong pak', 'Loại', 'Kích thước', 'Họ font', 'Glyph', 'Tiếng Việt', 'Phủ', 'Thiếu (đầu)'], pf, function (x) {
+        const m = x.metrics || {}, v = m.vietnamese, lv = v ? (VI_LV[v.level] || [v.level, '']) : null;
+        return [x.container + ': ' + x.file, (x.magic || '?') + (m.bmfont_format ? '/' + m.bmfont_format : ''), formatBytes(x.size), m.family || m.full || '—', m.glyphs == null ? '—' : String(m.glyphs),
+          lv ? h('span', { class: 'badge ' + lv[1], text: lv[0] }) : (m.status || 'chưa đọc'), v && v.percent != null ? v.covered + '/' + v.required + ' (' + v.percent + '%)' : '—', v && v.missing && v.missing.length ? v.missing.slice(0, 6).join(' ') + (v.missing_count > 6 ? ' … (+' + (v.missing_count - 6) + ')' : '') : '—'];
+      }, function (x) { return x.container + ' ' + x.file + ' ' + ((x.metrics && x.metrics.family) || ''); }, 'Tìm font trong pak'));
+    }
+    const inv = t.font_inventory || [];
+    if (inv.length) card.appendChild(listBlock('File font/atlas liệt kê trong pak (gồm ảnh atlas, chưa phân tích)', inv.map(function (x) { return x.path + (x.container ? ' [' + x.container + ']' : '') + (x.role ? ' · ' + x.role : ''); }), 100));
+    const fg = buildFontGenCard(t); if (fg) card.appendChild(fg);
+    return card;
+  }
+  /* Bộ sinh glyph tiếng Việt cho font bitmap (BMFont) trong pak: chọn font thiếu → font nguồn (TTF tải lên hoặc font hệ thống) → .fnt + atlas PNG mới. */
+  let fgSeq = 0;
+  function buildFontGenCard(t) {
+    const FG = NS.FontGenerator; if (!FG || !t) return null;
+    const blobs = {}; (NS.TextExtract.fontFiles(t) || []).forEach(function (b) { blobs[b.name] = b.data; });
+    const bn = function (pf) { return pf.container.replace(/[:\/]/g, '_') + '__' + pf.file.replace(/\//g, '__'); };
+    const all = (t.pak_fonts || []).filter(function (pf) { return pf.ok && blobs[bn(pf)]; });
+    const cands = all.filter(function (pf) { return pf.magic === 'bmfont' && pf.metrics && pf.metrics.vietnamese && pf.metrics.vietnamese.level !== 'full'; });
+    const vector = all.filter(function (pf) { return pf.magic !== 'bmfont' && pf.metrics && pf.metrics.vietnamese && pf.metrics.vietnamese.level !== 'full'; });
+    if (!cands.length && !vector.length) return null;
+    const card = h('div', { class: 'card mt-3' }, [h('h3', { class: 'section-title', text: 'Bộ sinh font Việt (bitmap/BMFont)' })]);
+    const kv = h('dl', { class: 'kv' });
+    kvRow(kv, 'Làm gì', 'Với font bitmap thiếu chữ Việt: vẽ các glyph còn thiếu từ một font nguồn bằng Canvas, xuất .fnt mới + atlas PNG. “Thêm trang” giữ nguyên atlas gốc; “Dựng lại” thay cả atlas bằng font nguồn.');
+    kvRow(kv, 'Chưa làm', 'Font TTF/OTF (' + vector.length + ' font thiếu chữ Việt trong pak chỉ được liệt kê), BMFont nhị phân, đóng gói ngược vào pak. Chưa kiểm trên game thật: engine có nhận trang atlas thêm/dựng lại hay không chưa biết.');
+    card.appendChild(kv);
+    if (!cands.length) { card.appendChild(h('p', { class: 'dim', text: 'Không có font bitmap (.fnt) nào thiếu chữ Việt trong pak.' })); return card; }
+    const selFont = h('select', { class: 'input', 'aria-label': 'Font bitmap cần bổ sung' }, cands.map(function (pf, i) { const v = pf.metrics.vietnamese; return h('option', { value: String(i), text: pf.file + ' — ' + v.covered + '/' + v.required + ' chữ Việt' }); }));
+    const selMode = h('select', { class: 'input', 'aria-label': 'Chế độ' }, [h('option', { value: 'append', text: 'Thêm trang atlas (giữ atlas gốc)' }), h('option', { value: 'rebuild', text: 'Dựng lại atlas 1 trang (mất kiểu gốc)' })]);
+    const fileIn = h('input', { type: 'file', accept: '.ttf,.otf,.woff', class: 'input', 'aria-label': 'Font nguồn (TTF/OTF/WOFF)' });
+    const famIn = h('input', { type: 'text', class: 'input', placeholder: 'hoặc tên font hệ thống, vd. Arial', 'aria-label': 'Tên font hệ thống' });
+    const sizeIn = h('input', { type: 'number', class: 'input', min: '4', max: '128', 'aria-label': 'Cỡ chữ (px)' });
+    const thrIn = h('input', { type: 'checkbox', 'aria-label': 'Làm sắc nét (pixel font)' });
+    const syncSize = function () { const pf = cands[+selFont.value], z = pf && pf.metrics && pf.metrics.size; sizeIn.value = z ? String(z) : '16'; }; selFont.addEventListener('change', syncSize); syncSize();
+    const out = h('div', { class: 'mt-3' }), btn = h('button', { class: 'btn btn-sm btn-primary', type: 'button', text: 'Sinh glyph' }), dlBtn = h('button', { class: 'btn btn-sm', type: 'button', text: 'Tải font_generator.zip' });
+    dlBtn.hidden = true; let lastZip = null;
+    const field = function (label, el) { return h('label', { class: 'field' }, [h('span', { class: 'dim', text: label }), el]); };
+    const form = h('div', { class: 'mt-3' }, [field('Font bitmap thiếu chữ Việt', selFont), field('Chế độ', selMode), field('Font nguồn: tải file TTF/OTF', fileIn), field('…hoặc font hệ thống', famIn), field('Cỡ chữ (px)', sizeIn), field('Làm sắc nét (ngưỡng alpha, cho pixel font)', thrIn)]);
+    card.appendChild(form); card.appendChild(h('div', { class: 'toolbar mt-3' }, [btn, dlBtn])); card.appendChild(out);
+    btn.addEventListener('click', async function () {
+      const pf = cands[+selFont.value], data = pf && blobs[bn(pf)]; out.replaceChildren(); dlBtn.hidden = true; lastZip = null;
+      if (!data) { toast('Không còn dữ liệu font – hãy phân tích lại IPA', 'warning'); return; }
+      const file = fileIn.files && fileIn.files[0], sysFam = famIn.value.trim(), size = Math.max(4, Math.min(128, parseInt(sizeIn.value, 10) || 16));
+      if (!file && !sysFam) { toast('Chọn file TTF/OTF hoặc nhập tên font hệ thống', 'warning'); return; }
+      btn.disabled = true; btn.textContent = 'Đang sinh…';
+      try {
+        let family = sysFam, has = null, srcNote = 'font hệ thống “' + sysFam + '”';
+        if (file) {
+          const buf = new Uint8Array(await file.arrayBuffer()); family = 'ipals-src-' + (++fgSeq); srcNote = 'file ' + file.name;
+          const face = new FontFace(family, buf.buffer.slice(0)); await face.load(); document.fonts.add(face);
+          try { const pm = await NS.FontMetrics.parse(buf); if (pm.status === 'parsed' && pm.fonts.length) { const req = new Set(NS.FontMetrics.VI_REQUIRED), vm = pm.fonts[0].vietnamese; if (vm.level !== 'unknown') { const missHex = new Set(vm.missing || []); has = function (cp) { return req.has(cp) ? !missHex.has('U+' + cp.toString(16).toUpperCase().padStart(4, '0')) : undefined; }; } } } catch (_) { has = null; }
+        } else if (!FG.systemFontAvailable(family)) { toast('Không thấy font hệ thống “' + family + '” (canvas sẽ dùng font mặc định, kết quả sai) – đã dừng', 'warning', 7000); return; }
+        const raster = FG.createCanvasRasterizer({ family: family, size: size, has: has, threshold: thrIn.checked ? 128 : 0 });
+        const res = await FG.generate({ fntBytes: data, fntPath: pf.file, raster: raster, mode: selMode.value });
+        const rp = res.report, kv2 = h('dl', { class: 'kv' });
+        kvRow(kv2, 'Kết quả', res.status + ' — ' + res.reason); kvRow(kv2, 'Font nguồn', srcNote + ' · cỡ ' + size + ' px' + (file ? '' : ' · KHÔNG kiểm chắc glyph có trong font hệ thống, hãy xem ảnh bên dưới'));
+        if (rp.summary) kvRow(kv2, 'Tiếng Việt sau khi sinh', rp.summary.vietnamese_after + '/' + rp.summary.vietnamese_required + ' · trang mới ' + rp.summary.pages_written);
+        out.appendChild(kv2); if (rp.warnings.length) out.appendChild(listBlock('Cảnh báo', rp.warnings)); if (rp.skipped_not_in_source.length) out.appendChild(listBlock('Font nguồn không có glyph', rp.skipped_not_in_source, 60));
+        const pg = res.files.filter(function (f) { return f.role === 'atlas-page'; })[0];
+        if (pg) { const url = URL.createObjectURL(new Blob([pg.data], { type: 'image/png' })), img = h('img', { src: url, alt: 'Atlas glyph mới (xem trước)', width: String(Math.min(rp.atlas.scaleW, 512)), class: 'fontgen-preview' }); img.addEventListener('load', function () { setTimeout(function () { URL.revokeObjectURL(url); }, 2000); }); out.appendChild(h('p', { class: 'dim', text: 'Xem trước atlas trang đầu (nền trong suốt, glyph trắng):' })); out.appendChild(img); }
+        if (res.files.length) {
+          const prefix = 'font_generator/pak/' + pf.container.replace(/^pak:/, '').replace(/^.*\//, '') + '/';
+          lastZip = NS.PakHeads.buildZip(FG.toFiles(res, prefix)); dlBtn.hidden = false;
+        }
+        toast(res.status === 'ok' ? 'Đã sinh glyph' : (res.status === 'partial' ? 'Sinh được một phần – xem cảnh báo' : 'Không sinh được: ' + res.reason), res.status === 'ok' ? 'success' : 'warning', 6000);
+      } catch (e) { toast('Lỗi sinh font: ' + ((e && e.message) || e), 'error', 7000); }
+      finally { btn.disabled = false; btn.textContent = 'Sinh glyph'; }
+    });
+    dlBtn.addEventListener('click', function () { if (lastZip) saveBlob('font_generator.zip', lastZip, 'application/zip'); });
+    return card;
+  }
   /* Thẻ TMP_FontAsset (5.2d): ký tự có trong ATLAS của TextMesh Pro (khác với ký tự có trong file font nguồn). Heuristic: ghi rõ mức tin cậy. */
   const TMP_ST = { parsed: 'Đọc đủ', partial: 'Một phần', glyph_table_not_found: 'Không thấy bảng glyph', layout_unknown: 'Không nhận ra bố cục', too_large: 'Quá lớn', error: 'Lỗi' };
   function buildTmpCard(t) {

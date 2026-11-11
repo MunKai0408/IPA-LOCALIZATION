@@ -182,10 +182,10 @@
         <div class="card empty" id="texts-empty">
           <div class="empty-icon" aria-hidden="true">Aa</div>
           <h2>Text trích xuất</h2>
-          <p>Chưa có kết quả. Tải IPA rồi bấm Bắt đầu phân tích. Trang trích text từ .strings/.stringsdict/.xcstrings/JSON/CSV/PO/XML… trong IPA và trong pak Heaps (kèm font trong pak). Mọi xử lý chạy trên máy bạn.</p>
+          <p>Chưa có kết quả. Tải IPA rồi bấm Bắt đầu phân tích. Trang trích text từ .strings/.stringsdict/.xcstrings/JSON/CSV/PO/XML… trong IPA và trong pak Heaps (kèm font trong pak). Mọi xử lý chạy trên máy bạn. Có thể dịch ngay trong bảng, hoặc nạp CSV đã dịch.</p>
         </div>
         <div id="texts-detail" hidden>
-          <div class="toolbar"><span class="spacer"></span><button class="btn btn-sm btn-primary" id="btn-pack-zip" type="button">Tải gói dịch (zip)</button><button class="btn btn-sm" id="btn-apply-csv" type="button">Nhập bản dịch (CSV) → file đã dịch</button><input type="file" id="apply-csv-input" accept=".csv,text/csv" hidden><button class="btn btn-sm" id="btn-texts-csv" type="button">Tải texts.csv</button><button class="btn btn-sm" id="btn-texts-json" type="button">Tải texts_index.json</button><button class="btn btn-sm" id="btn-pakfonts-zip" type="button">Tải pak_fonts.zip</button></div>
+          <div class="toolbar"><span class="spacer"></span><button class="btn btn-sm btn-primary" id="btn-pack-zip" type="button">Tải gói dịch (zip)</button><button class="btn btn-sm btn-primary" id="btn-apply-now" type="button">Áp dụng bản dịch → translated.zip</button><button class="btn btn-sm" id="btn-apply-csv" type="button">Nạp CSV đã dịch</button><button class="btn btn-sm" id="btn-translated-csv" type="button">Xuất CSV (kèm bản dịch)</button><input type="file" id="apply-csv-input" accept=".csv,text/csv" hidden><button class="btn btn-sm" id="btn-texts-csv" type="button">Tải texts.csv</button><button class="btn btn-sm" id="btn-texts-json" type="button">Tải texts_index.json</button><button class="btn btn-sm" id="btn-pakfonts-zip" type="button">Tải pak_fonts.zip</button></div>
           <div class="card mt-3" id="texts-body"></div>
         </div>
       </section>
@@ -217,6 +217,19 @@
       </section>
 
       <!-- Các view chưa triển khai (ui.js sinh ra) -->
+      <!-- Localization: tổng quan đa ngôn ngữ từ text đã trích -->
+      <section class="view" id="view-localization" hidden>
+        <div class="card empty" id="loc-empty">
+          <div class="empty-icon" aria-hidden="true">🌐</div>
+          <h2>Localization</h2>
+          <p>Chưa có dữ liệu. Tải IPA rồi bấm Bắt đầu phân tích. Trang tổng hợp ngôn ngữ có trong game (từ text đã trích), so khớp khóa giữa ngôn ngữ nguồn và đích (ví dụ en → vi) và xuất mẫu dịch chỉ gồm các khóa còn thiếu, kèm cột tham khảo ngôn ngữ khác.</p>
+        </div>
+        <div id="loc-detail" hidden>
+          <div class="toolbar"><span class="spacer"></span><button class="btn btn-sm" id="btn-loc-json" type="button">Tải localization.json</button></div>
+          <div class="card mt-3" id="loc-body"></div>
+        </div>
+      </section>
+
       <div id="generic-views"></div>
 
       <!-- CÀI ĐẶT -->
@@ -257,6 +270,8 @@
   <script src="js/modules/raw_strings.js"></script>
   <script src="js/modules/text_extract.js"></script>
   <script src="js/modules/translation_apply.js"></script>
+  <script src="js/modules/localization.js"></script>
+  <script src="js/modules/font_generator.js"></script>
   <script src="js/modules/candidates.js"></script>
 <script src="js/ipa_reader.js"></script>
 <script src="js/worker_manager.js"></script>

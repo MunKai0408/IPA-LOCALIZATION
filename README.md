@@ -132,3 +132,13 @@ Việc dở cũ đã hủy: xem `docs/archive/`. Kế hoạch mới: `ROADMAP.md
 Trong view **Text trích xuất**: tải `texts.csv`, thêm cột `translation` (bản dịch), bấm **Nhập bản dịch (CSV) → file đã dịch**. Trang kiểm placeholder (`%s`, `{0}`, `::x::`…; thiếu/thừa = chặn dòng đó), ghi bản dịch vào đúng file gốc (.strings, .json, .cdb, .xcstrings, .po, .properties, .csv, .txt), **đọc lại từng file đã vá** để chắc chỉ các dòng dịch thay đổi, rồi tải `translated.zip` (file đã dịch + `patch_plan.json` + `apply_report.json`).
 Giới hạn: chưa ghi vào pak/IPA (patch_plan cho biết cần dựng lại pak vì kích thước đổi, IPA cần ký lại); chưa hỗ trợ xml/plist/dòng quét thô; chữ Việt cần font game hỗ trợ. Mới kiểm bằng dữ liệu GIẢ LẬP.
 Test: `python3 tests/make_text_ipas.py D && node tests/run_apply_tests.js D   # 32`.
+
+## Cập nhật 0.18.1 (mục Font + Text)
+- **Text:** dịch ngay trong bảng (tìm, lọc, phân trang, kiểm placeholder trực tiếp), nạp/xuất CSV, áp dụng ra `translated.zip`. Bản dịch chỉ lưu trong bộ nhớ trang: xuất CSV để giữ.
+- **Font:** thêm thẻ “Font trong file .pak”: họ font, số glyph, độ phủ 134 chữ Việt có dấu (đủ/thiếu một phần/không có) cho TTF/OTF/WOFF và BMFont (.fnt). BMFont chỉ đếm ký tự khai báo, không kiểm ảnh atlas.
+- Test mới: `python3 tests/make_pakfont_fonts.py D && node tests/run_pakfont_tests.js D   # 16`. Font/dữ liệu GIẢ LẬP; giao diện đã thử bằng Chromium headless với dữ liệu giả.
+
+## Cập nhật 0.19.0 (Localization)
+View **Localization** (trước đây trống): liệt kê ngôn ngữ có trong game từ text đã trích, độ phủ khóa so với ngôn ngữ chuẩn, so khớp nguồn → đích (mặc định en → vi): khóa chưa có, khóa y nguyên bản nguồn (nghi chưa dịch). Tải mẫu CSV chỉ gồm khóa cần dịch, kèm cột tham khảo các ngôn ngữ khác (vd. ref_fr). Dịch xong nạp ở “Text trích xuất”.
+Giới hạn: ghép khóa giữa ngôn ngữ là heuristic; bản dịch ghi đè file ngôn ngữ nguồn, chưa thêm được file ngôn ngữ mới (vi.lproj…); ngôn ngữ trong bảng Unity/I2 chưa đọc (Phase 9.1).
+Test: `node tests/run_localization_tests.js   # 16` (không cần fixture).

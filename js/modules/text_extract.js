@@ -240,6 +240,49 @@
     return null;
   }
 
+  /** Đọc BMFont (.fnt: text, XML hoặc nhị phân v3) → {format, face, size, chars, vietnamese}. Không chắc → null. */
+  function viCoverage(idSet) {
+    const FM = NS.FontMetrics; if (!FM || !FM.VI_REQUIRED) return null;
+    const req = FM.VI_REQUIRED, miss = req.filter(function (c) { return !idSet.has(c); });
+    let asciiOk = true; for (let c = 65; c <= 122; c++) if ((c <= 90 || c >= 97) && !idSet.has(c)) { asciiOk = false; break; }
+    return { level: miss.length === 0 ? 'full' : miss.length === req.length ? 'none' : 'partial', required: req.length, covered: req.length - miss.length, missing_count: miss.length,
+      missing: miss.slice(0, 150).map(function (c) { return 'U+' + c.toString(16).toUpperCase().padStart(4, '0'); }), percent: Math.round((req.length - miss.length) * 1000 / req.length) / 10, ascii_letters_ok: asciiOk };
+  }
+  function parseBmfont(b) {
+    const ids = new Set(); let fmt = null, face = null, size = null;
+    if (b.length > 4 && b[0] === 66 && b[1] === 77 && b[2] === 70 && b[3] === 3) {
+      fmt = 'binary'; let p = 4; const dv = new DataView(b.buffer, b.byteOffset, b.length);
+      while (p + 5 <= b.length) {
+        const type = b[p], sz = dv.getUint32(p + 1, true); p += 5; if (sz > b.length - p) break;
+        if (type === 1 && sz > 15) { size = Math.abs(dv.getInt16(p, true)); let q = p + 14, e = q; while (e < p + sz && b[e] !== 0) e++; face = new TextDecoder().decode(b.subarray(q, e)); }
+        else if (type === 4) for (let q = p; q + 20 <= p + sz; q += 20) ids.add(dv.getUint32(q, true));
+        p += sz;
+      }
+    } else {
+      const d = decode(b); if (!d) return null; const t = d.text;
+      let m;
+      if (/^\s*(<\?xml|<font)/.test(t)) { fmt = 'xml'; const re = /<char\s[^>]*?\bid="(\d+)"/g; while ((m = re.exec(t))) ids.add(+m[1]); m = /<info[^>]*?\bface="([^"]*)"/.exec(t); face = m ? m[1] : null; m = /<info[^>]*?\bsize="(-?\d+)"/.exec(t); size = m ? Math.abs(+m[1]) : null; }
+      else if (/^\s*info\s/.test(t)) { fmt = 'text'; const re = /^\s*char\s+id=(\d+)/gm; while ((m = re.exec(t))) ids.add(+m[1]); m = /^\s*info\s[^\n]*?face="([^"]*)"/m.exec(t); face = m ? m[1] : null; m = /^\s*info\s[^\n]*?size=(-?\d+)/m.exec(t); size = m ? Math.abs(+m[1]) : null; }
+      else return null;
+    }
+    if (!ids.size) return null;
+    return { format: fmt, face: face, size: size, chars: ids.size, vietnamese: viCoverage(ids) };
+  }
+  /** Metadata font trong pak: TTF/OTF/TTC/WOFF qua FontMetrics.parse, BMFont qua parseBmfont. Không ném. */
+  async function fontMetricsOf(magic, bytes) {
+    try {
+      if (magic === 'bmfont') { const r = parseBmfont(bytes); return r ? { status: 'parsed', kind: 'bmfont', family: r.face, size: r.size, glyphs: r.chars, bmfont_format: r.format, vietnamese: r.vietnamese } : { status: 'unparsed', kind: 'bmfont', reason: 'không đọc được danh sách ký tự BMFont' }; }
+      const FM = NS.FontMetrics; if (!FM) return { status: 'unparsed', reason: 'thiếu font_metrics.js' };
+      const r = await FM.parse(bytes);
+      if (r.status !== 'parsed' || !r.fonts.length) return { status: r.status, kind: magic, reason: r.reason || null };
+      const rank = { full: 3, partial: 2, none: 1, unknown: 0 };
+      const best = r.fonts.slice().sort(function (a, b) { return (rank[b.vietnamese.level] || 0) - (rank[a.vietnamese.level] || 0) || (b.vietnamese.covered || 0) - (a.vietnamese.covered || 0); })[0];
+      const v = best.vietnamese;
+      return { status: 'parsed', kind: magic, family: best.names.typographic_family || best.names.family || null, full: best.names.full || null, glyphs: best.num_glyphs, fonts_in_file: r.fonts.length,
+        vietnamese: { level: v.level, required: v.required, covered: v.covered, missing_count: v.missing_count, missing: (v.missing || []).slice(0, 150), percent: v.percent, ascii_letters_ok: v.ascii_letters_ok } };
+    } catch (e) { return { status: 'error', reason: (e && e.message) || String(e) }; }
+  }
+
   /** Đọc tuần tự 1 entry zip, gom các khoảng byte cần lấy. ranges: [{start,end,tag}] sắp theo start. */
   async function captureRanges(file, entry, ranges, cancelled) {
     const IR = NS.IpaReader; let off = 0, k = 0; const bufs = ranges.map(function () { return []; });
@@ -302,7 +345,7 @@
     }
 
     /* (2) bên trong pak Heaps (text + font) */
-    const ph = result && result.pak_heads; let fontTotal = 0; out._fontBlobs = [];
+    const ph = result && result.pak_heads; let fontTotal = 0; out._fontBlobs = []; const fontJobs = [];
     if (ph && ph.pak_files) for (let pi = 0; pi < ph.pak_files.length; pi++) {
       const pk = ph.pak_files[pi], hp = pk.heaps;
       if (!hp || hp.status !== 'ok' || !hp._files) { if (pk.format_guess && pk.format_guess !== 'heaps_pak') out.unsupported.push({ file: pk.zip_path, reason: 'pak định dạng ' + pk.format_guess + ' – chưa có trình đọc' }); else if (hp) out.unsupported.push({ file: pk.zip_path, reason: 'cây pak chưa xác minh (' + hp.status + '): ' + hp.notes.join(' ') }); continue; }
@@ -329,7 +372,7 @@
           if (t.font) {
             if (fontMagic(b)) keep('pak/' + pk.zip_path.replace(/^.*\//, '') + '/' + t.path, c, t.path, b, 'font-' + fontMagic(b), { pak: pk.zip_path, pak_data_offset: t.start, pak_entry_size: b.length });
             const fm = fontMagic(b), kind = fm || 'không nhận ra magic';
-            out.pak_fonts.push({ container: c, file: t.path, size: b.length, magic: fm, ok: !!fm });
+            const pf = { container: c, file: t.path, size: b.length, magic: fm, ok: !!fm }; out.pak_fonts.push(pf); if (fm) fontJobs.push({ pf: pf, magic: fm, bytes: b });
             if (fm && fontTotal + b.length <= LIMITS.max_font_total) { fontTotal += b.length; out._fontBlobs.push({ name: c.replace(/[:\/]/g, '_') + '__' + t.path.replace(/\//g, '__'), data: b }); }
             return;
           }
@@ -340,6 +383,8 @@
         if (failText > 0 && okText === 0) out.warnings.push('Pak ' + pk.zip_path + ': MỌI file text đều không giải mã được → bố cục pak (offset dữ liệu) có thể sai, hoặc nội dung nén/mã hóa riêng.');
       } catch (err) { if (err && err.code === 'CANCELLED') throw err; out.warnings.push('Không đọc được nội dung pak ' + pk.zip_path + ': ' + ((err && err.message) || err)); }
     }
+
+    for (let i = 0; i < fontJobs.length; i++) { chk(); fontJobs[i].pf.metrics = await fontMetricsOf(fontJobs[i].magic, fontJobs[i].bytes); fontJobs[i].bytes = null; }   // độ phủ tiếng Việt của font trong pak
 
     /* (3) DỰ PHÒNG MỌI ENGINE: quét chuỗi thô các container chưa có trình đọc (pak không rõ cấu trúc, .bin/.dat/.obb/.assets…). [HYPOTHESIS] */
     if (opts.rawFallback !== false && NS.RawStrings) {
@@ -375,7 +420,8 @@
       if (r.placeholders.length) withPh++; if (r.confidence === 'low') low++; if (r.text === '') emptyT++; if (r.context === 'khóa trùng trong file') dups++;
     });
     out.summary = { rows: out.rows.length, files: out.files.length, skipped: out.skipped.length, unsupported: out.unsupported.length, by_lang: byLang, by_format: byFmt,
-      with_placeholders: withPh, low_confidence: low, empty_text: emptyT, duplicate_keys: dups, pak_fonts: out.pak_fonts.length, pak_fonts_ok: out.pak_fonts.filter(function (f) { return f.ok; }).length };
+      with_placeholders: withPh, low_confidence: low, empty_text: emptyT, duplicate_keys: dups, pak_fonts: out.pak_fonts.length, pak_fonts_ok: out.pak_fonts.filter(function (f) { return f.ok; }).length,
+      pak_fonts_vi: { full: out.pak_fonts.filter(function (f) { return f.metrics && f.metrics.vietnamese && f.metrics.vietnamese.level === 'full'; }).length, partial: out.pak_fonts.filter(function (f) { return f.metrics && f.metrics.vietnamese && f.metrics.vietnamese.level === 'partial'; }).length, none: out.pak_fonts.filter(function (f) { return f.metrics && f.metrics.vietnamese && f.metrics.vietnamese.level === 'none'; }).length } };
     if (out.rows.length) { out.status = 'ok'; out.reason = out.rows.length + ' dòng text từ ' + out.files.length + ' file' + (out.pak_fonts.length ? ' · ' + out.pak_fonts.length + ' font trong pak' : ''); }
     else if (out.pak_fonts.length) { out.status = 'ok'; out.reason = 'Không có text; có ' + out.pak_fonts.length + ' font trong pak'; }
     return out;
@@ -414,6 +460,6 @@
   }
   function fontFiles(r) { return (r._fontBlobs || []).slice(); }
 
-  NS.TextExtract = { SCHEMA: SCHEMA, LIMITS: LIMITS, run: run, extractBytes: extractBytes, parseCdb: parseCdb, parseStringsText: parseStringsText, parseXml: parseXml, parsePo: parsePo, parseCsv: parseCsv, splitCsv: splitCsv, csvEscape: csvEscape, parseXcstrings: parseXcstrings, parseJsonWalk: parseJsonWalk, parseProperties: parseProperties, decode: decode, extOf: extOf,
+  NS.TextExtract = { SCHEMA: SCHEMA, LIMITS: LIMITS, run: run, extractBytes: extractBytes, LANG: LANG, parseCdb: parseCdb, parseBmfont: parseBmfont, fontMetricsOf: fontMetricsOf, parseStringsText: parseStringsText, parseXml: parseXml, parsePo: parsePo, parseCsv: parseCsv, splitCsv: splitCsv, csvEscape: csvEscape, parseXcstrings: parseXcstrings, parseJsonWalk: parseJsonWalk, parseProperties: parseProperties, decode: decode, extOf: extOf,
     placeholders: placeholders, confidence: confidence, fontMagic: fontMagic, toCsv: toCsv, toPack: toPack, toIndex: toIndex, fontFiles: fontFiles };
 })(typeof window !== 'undefined' ? window : self);

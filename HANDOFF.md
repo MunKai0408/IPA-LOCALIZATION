@@ -80,3 +80,23 @@
 - Test: tests/run_apply_tests.js 32 ca (GIẢ LẬP; dùng IPA của make_text_ipas.py). 17 bộ cũ giữ nguyên (chạy chung 1 thư mục: tất cả make_*.py vào cùng DIR rồi mọi run_*).
 - NEXT_TASK cũ (0.14.0) đã lỗi thời: đã thay.
 - CHƯA có: ghi lại vào pak Heaps/IPA (dựng pak + zip + ký), xml/plist, xcstrings thêm localization mới, font Việt. UI nút chưa thử trong trình duyệt thật (chỉ node --check + logic).
+
+## v0.18.1-ui
+- Text: trình soạn bản dịch trong trang (ui.js buildTranslationEditor), `#btn-apply-csv` giờ chỉ NẠP CSV vào trình soạn; áp dụng bằng `#btn-apply-now`. translation_apply.js thêm toTranslatedCsv/mergeCsv.
+- Font: text_extract tính metrics cho font trong pak (parseBmfont, fontMetricsOf); ui.js buildPakFontsCard.
+- Test: +run_pakfont_tests.js (16). Tổng 19 file test, đều đạt. Smoke UI bằng Playwright (không nằm trong repo).
+- CHƯA có: lưu bản dịch qua lần tải lại, glossary/dịch hàng loạt, kiểm atlas BMFont thật, bộ sinh font Việt, ghi lại pak/IPA.
+
+## v0.19.0-loc
+- THÊM js/modules/localization.js + view Localization (ui.js renderLocalization, section tĩnh index.html). `LANG` export từ text_extract. Test run_localization_tests.js (16). Tổng 20 file test đều đạt.
+- View “Văn bản” (id text) vẫn là placeholder; chưa có: thêm file ngôn ngữ mới (vi.lproj/xcstrings localization vi), Unity I2/StringTable.
+
+## v0.20.0-fontgen
+- THÊM js/modules/font_generator.js (NS.FontGenerator) + thẻ "Bộ sinh font Việt" trong view Font (ui.js buildFontGenCard, hiện khi pak có font BMFont .fnt thiếu chữ Việt). Chỉ API trình duyệt (Canvas/FontFace), không thư viện ngoài.
+- Chế độ `append`: giữ atlas gốc, vẽ glyph thiếu (theo VI_REQUIRED, 134 chữ) vào trang PNG MỚI `<tên>_vi<k>.png` cạnh .fnt, thêm `page` + `char` vào .fnt (giữ info/kerning/BOM/CRLF; text và XML). Chế độ `rebuild`: dựng lại 1 trang (ghi đè tên trang 0), bỏ kerning, atlas tự nới ≤ 4096.
+- Font nguồn: file TTF/OTF/WOFF tải lên (có kiểm cmap qua FontMetrics) hoặc font hệ thống (chỉ kiểm bằng so 2 font dự phòng – KHÔNG chắc 100%, xem ảnh xem trước). Glyph = trắng + alpha; `yoffset = base − ascent`.
+- Từ chối/không làm: BMFont nhị phân, `packed`/`chnl`≠15 ở append, TTF/OTF (chỉ liệt kê), kerning glyph mới, đóng gói ngược vào pak. Mọi lỗi → status + reason, không ném; .fnt sau khi ghi được đọc lại để xác minh số ký tự.
+- Xuất zip: font_generator/pak/<tên pak>/<đường dẫn .fnt> + PNG + font_generator_report.json (limitations, warnings) + HUONG_DAN.txt.
+- Test: tests/run_fontgen_tests.js (39 ca, rasterizer GIẢ LẬP; PNG kiểm bằng zlib + CRC) + tests/make_fontgen_ipas.py (IPA giả có pak Heaps + .fnt). Smoke bằng Playwright/Chromium (ngoài repo): tải TTF DejaVu → 134/134 chữ Việt, ảnh atlas đúng; font hệ thống; tên font không tồn tại bị chặn. 21 file test đều đạt.
+- [HYPOTHESIS] CHƯA kiểm trên game thật: engine (Heaps/Dead Cells) có đọc trang atlas > 0 hay atlas dựng lại không CHƯA BIẾT; atlas gốc không được giải mã nên nét/viền/màu glyph mới có thể lệch.
+- Người dùng: chạy trang trên IPA thật → view Font → sinh glyph cho .fnt thiếu → gửi font_generator.zip + font_generator_report.json (và .fnt gốc từ pak_fonts.zip) để đối chiếu.
