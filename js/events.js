@@ -40,7 +40,7 @@
       },
       engine: r.engine ? { engine: r.engine.engine, variant: r.engine.variant, confidence: r.engine.confidence, status: r.engine.status,
                            analysis_branch: r.engine.analysis_branch, version: r.engine.version } : null,
-      stats: Object.assign({}, s.stats, { totalFiles: r.manifest ? r.manifest.summary.totalFiles : r.zip.fileCount, fontCount: r.fonts && r.fonts.summary ? r.fonts.summary.fonts_valid : null }),
+      stats: Object.assign({}, s.stats, NS.SessionStats.compute(r)),
       manifest: r.manifest ? { summary: r.manifest.summary, options: r.manifest.options, generatedAt: r.manifest.generatedAt } : null,
       results: Object.assign({}, s.results, { ipa: r, engine: r.engine || null, manifest: r.manifest || null, unity: r.unity || null, fonts: r.fonts || null, fontFiles: r.font_files || null, unityfs: r.unityfs || null, serialized: r.serialized || null, fontMetrics: r.font_metrics || null, tmpFonts: r.tmp_fonts || null, candidates: r.candidates || null, pakHeads: r.pak_heads || null, texts: r.texts || null, serializedFiles: r.serialized_files || null, reportEngine: r.engine ? NS.DetectEngine.toReportFields(r.engine) : null })
     });

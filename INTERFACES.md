@@ -35,7 +35,7 @@ Session = {
   app: null | { name, bundleId, version, build, architectures:string[] },   // Phase 1 điền
   engine: null | { engine, variant, confidence, ... },                      // Phase 2 điền
   manifest: null, results: {},
-  stats: { totalFiles, fontCount, stringCount, localizationTables }  // null = chưa có
+  stats: { totalFiles, fontCount, stringCount, localizationTables, stringSource, tableBreakdown }  // null = chưa có; 0 = đã chạy, không thấy. Tính bởi NS.SessionStats.compute(IpaResult) (js/modules/session_stats.js)
   steps: [{id,label,status,message}], progress: 0..1,
   startedAt, completedAt
 }

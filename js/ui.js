@@ -953,10 +953,23 @@
     kvRow(kv, 'Font trong object Font', s.fonts_extracted + ' trích xuất (' + s.fonts_valid + ' hợp lệ) / ' + s.fonts);
     kvRow(kv, 'MonoBehaviour', s.monobehaviours_resolved + ' quy về class script · ' + s.monobehaviours_unresolved + ' chưa xác định');
     card.appendChild(kv);
-    const top = Object.keys(s.by_class).sort(function (a, b) { return s.by_class[b] - s.by_class[a]; });
-    card.appendChild(buildPagedTable(['Loại object', 'Số lượng'], top, function (k) { return [k, String(s.by_class[k])]; }, function (k) { return k; }, 'Tìm loại'));
-    const mono = Object.keys(sr.mono_classes).sort(function (a, b) { return sr.mono_classes[b] - sr.mono_classes[a]; });
-    if (mono.length) card.appendChild(buildPagedTable(['Class script (MonoBehaviour)', 'Số lượng'], mono, function (k) { return [k, String(sr.mono_classes[k])]; }, function (k) { return k; }, 'Tìm class'));
+    const inv = sr.inventory;
+    if (inv && inv.classes.length) {
+      card.appendChild(buildPagedTable(['Loại object', 'ClassID', 'Số lượng', 'Dung lượng', 'Số file'], inv.classes, function (c) { return [c.class_name, c.class_id === null ? '' : String(c.class_id), String(c.count), formatBytes(c.bytes), String(c.files)]; }, function (c) { return c.class_name + ' ' + c.class_id; }, 'Tìm loại'));
+    } else {
+      const top = Object.keys(s.by_class).sort(function (a, b) { return s.by_class[b] - s.by_class[a]; });
+      card.appendChild(buildPagedTable(['Loại object', 'Số lượng'], top, function (k) { return [k, String(s.by_class[k])]; }, function (k) { return k; }, 'Tìm loại'));
+    }
+    if (inv && inv.carriers.length) {
+      card.appendChild(h('h3', { class: 'mt-3', text: 'Nơi có thể chứa text hiển thị [HYPOTHESIS – chỉ theo tên/loại, chưa phải bằng chứng]' }));
+      const KIND = { localization_script: 'Bảng localization (script)', text_asset: 'TextAsset', ui_text_component: 'Component text UI', legacy_text_component: 'Text cũ', font_asset: 'TMP_FontAsset', font: 'Font' };
+      card.appendChild(buildPagedTable(['Loại', 'File', 'Nhãn', 'SL', 'Dung lượng', 'Tên mẫu', 'Ghi chú'], inv.carriers, function (c) {
+        return [KIND[c.kind] || c.kind, c.file, c.label, String(c.count), c.bytes === null ? '' : formatBytes(c.bytes), (c.sample_names || []).join(', '), c.why + (c.looks_like && Object.keys(c.looks_like).length ? ' Dạng: ' + Object.keys(c.looks_like).map(function (k) { return k + '×' + c.looks_like[k]; }).join(', ') + '.' : '')];
+      }, function (c) { return c.kind + ' ' + c.file + ' ' + c.label + ' ' + (c.sample_names || []).join(' '); }, 'Tìm ứng viên'));
+      if (inv.notes.length) card.appendChild(listBlock('Ghi chú kiểm kê', inv.notes));
+    }
+    const md = sr.mono_detail || {}, mono = Object.keys(sr.mono_classes).sort(function (a, b) { return sr.mono_classes[b] - sr.mono_classes[a]; });
+    if (mono.length) card.appendChild(buildPagedTable(['Class script (MonoBehaviour)', 'Số lượng', 'Dung lượng', 'Tên object mẫu'], mono, function (k) { const d = md[k]; return [k, String(sr.mono_classes[k]), d ? formatBytes(d.bytes) : '', d ? d.samples.join(', ') : '']; }, function (k) { return k + ' ' + ((md[k] && md[k].samples) || []).join(' '); }, 'Tìm class'));
     card.appendChild(buildPagedTable(['File', 'Trạng thái', 'Version', 'Object', 'Trích xuất'], sr.files, function (it) {
       return [it.path, (SF_STATUS[it.status] || it.status) + (it.status !== 'parsed' && it.reason ? ' – ' + it.reason : ''), it.version === null ? '' : String(it.version), it.object_count === null ? '' : String(it.object_count), it.extraction || ''];
     }, function (it) { return it.path + ' ' + it.status; }, 'Tìm file'));

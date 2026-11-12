@@ -100,3 +100,15 @@
 - Test: tests/run_fontgen_tests.js (39 ca, rasterizer GIẢ LẬP; PNG kiểm bằng zlib + CRC) + tests/make_fontgen_ipas.py (IPA giả có pak Heaps + .fnt). Smoke bằng Playwright/Chromium (ngoài repo): tải TTF DejaVu → 134/134 chữ Việt, ảnh atlas đúng; font hệ thống; tên font không tồn tại bị chặn. 21 file test đều đạt.
 - [HYPOTHESIS] CHƯA kiểm trên game thật: engine (Heaps/Dead Cells) có đọc trang atlas > 0 hay atlas dựng lại không CHƯA BIẾT; atlas gốc không được giải mã nên nét/viền/màu glyph mới có thể lệch.
 - Người dùng: chạy trang trên IPA thật → view Font → sinh glyph cho .fnt thiếu → gửi font_generator.zip + font_generator_report.json (và .fnt gốc từ pak_fonts.zip) để đối chiếu.
+
+## v0.21.0-unity-inventory
+- serialized_file.js: bảng ClassID→tên mở rộng (~150 ID, từ trí nhớ – HYPOTHESIS); `class_bytes` (dung lượng theo loại) ở parse/file/summary (`by_class_bytes`); `monoName` đọc m_Name của MonoBehaviour (không cần type tree) → `mono_detail[class] = {count, bytes, files, samples}`; TextAsset thêm `looks_like` (json/xml/csv/tsv/ini/lua?/base64?/plain), `preview`, `name_hint`; `buildInventory` → `serialized.inventory` (schema unity_inventory/1: classes, files, carriers xếp hạng "nơi có thể chứa text hiển thị"). LIMITS.mono_names (mặc định true) làm file chỉ có MonoBehaviour cũng được đọc đủ để lấy tên.
+- ui.js: thẻ SerializedFile có bảng loại object (ClassID, SL, dung lượng, số file), bảng carriers [HYPOTHESIS], bảng class script kèm tên mẫu. Tải qua nút unity_serialized.json (đã gồm inventory).
+- Test: tests/make_inventory_ipas.py + run_inventory_tests.js (29 ca, GIẢ LẬP); 21 bộ cũ giữ nguyên, tổng 22.
+- CHƯA: kiểm trên Unity thật; UI chưa thử trong trình duyệt thật; giải mã MonoBehaviour (m_text, bảng I2) – 9.1; .resS.
+
+## v0.21.1-stats (A3)
+- THÊM js/modules/session_stats.js (NS.SessionStats.compute, thuần dữ liệu); events.js applyResult dùng nó → `session.stats.stringCount` và `localizationTables` hết null sau khi chạy. index.html thêm script (worker KHÔNG cần).
+- stringCount = texts.summary.rows; nếu 0 thì dùng unity.metadata_literals.count (status ok); texts đã chạy mà trống → 0; chưa chạy/lỗi → null. localizationTables = số (container|file) text có mã ngôn ngữ + bảng Unity chưa đọc từ candidates (unity.i2/localization_package/textasset, mỗi path 1). stats còn có stringSource, tableBreakdown{read, unity_unread}.
+- Test: tests/run_stats_tests.js (23 ca, dùng IPA giả của text/candidates/serialized/inventory); tổng 23 bộ. Smoke Playwright (ngoài repo): text_ios → 15 chuỗi / 6 bảng, text_pak → 4/2, cand_unity_bundles → 0/2 hiển thị đúng trên dashboard.
+- Lưu ý: "bảng" là số ĐÃ THẤY, không phải bằng chứng game dùng lúc chạy. Unity TextAsset chưa vào stringCount (text_extract chưa đọc Unity).
